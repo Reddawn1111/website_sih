@@ -156,7 +156,10 @@ function renderDashboard(state, data) {
         <div class="insight-list">${insightItems}</div>
       </section>
       <section class="card span-7">${renderMap(state, data)}</section>
-      <section class="card pad span-12">${renderMobilityPressure(data.mobilitySummary)}</section>
+      <section class="card pad span-12">
+        <h2>Mobility Pressure</h2>
+        ${renderMobilityPressure(data.mobilitySummary)}
+      </section>
       <section class="card pad span-6">${renderLineChart("Visits over time", data.visitsOverTime, "Visits")}</section>
       <section class="card pad span-6">${renderHourlyCurve(data.hourlyCurve)}</section>
       <section class="card pad span-12">${renderActionSummary(actions)}</section>
@@ -202,8 +205,9 @@ function renderMobilityPressure(summary) {
   return `
     <div class="mobility-pressure-grid">
       <div><span class="label">Road pressure</span><strong class="status-${summary.roadPressure}">${summary.roadPressure.toUpperCase()}</strong></div>
-      <div><span class="label">Transit pressure</span><strong class="status-${summary.transitPressure}">${summary.transitPressure === "Insufficient sample size" ? summary.transitPressure : summary.transitPressure.toUpperCase()}</strong></div>
-      <div><span class="label">Peak visitor concentration</span><strong>${summary.peakWindow}</strong></div>
+      <div><span class="label">Transit pressure</span><strong class="status-${summary.transitPressure === "Insufficient sample size" ? "moderate" : summary.transitPressure}">${summary.transitPressure === "Insufficient sample size" ? summary.transitPressure : summary.transitPressure.toUpperCase()}</strong></div>
+      <div><span class="label">Visitor concentration</span><strong>${summary.visitorConcentration}</strong></div>
+      <div><span class="label">Peak hour pressure</span><strong>${summary.peakWindow}</strong></div>
       <div><span class="label">Average travel delay</span><strong>+${summary.averageDelay}%</strong></div>
       <div class="mobility-corridor"><span class="label">Top movement corridor</span><strong>${summary.topCorridor}</strong></div>
     </div>
@@ -220,7 +224,7 @@ function renderTourism(state, data) {
       <section class="card pad span-6">${renderDestinationRanking(data.placesWithStats)}</section>
       <section class="card pad span-12">
         <h2>Destination Intelligence</h2>
-        ${renderDestinationList(data.placesWithStats)}
+        ${renderDestinationList(data.placesWithStats, state.selectedDestination)}
       </section>
     </section>
   `;
@@ -259,15 +263,13 @@ function renderOpportunities(state, data) {
         <h2>Under-Visited But High-Potential Places</h2>
         <div class="destination-list">
           ${tourismOpportunities(data.placesWithStats).map((place) => `
-            <div class="destination-row" data-destination="${place.id}">
-              <strong>${place.name}</strong>
-              <span>Rating ${place.rating}</span>
-              <span>${place.stat.visitCount.toLocaleString("en-IN")} visits</span>
-              <span>${place.stat.averageDwellMinutes} min dwell</span>
-              <span class="status-${place.stat.crowdLevel}">${place.stat.crowdLevel}</span>
-              <span>${place.opportunityScore}/100 score</span>
-              <span>${promotionText(place, data.placesWithStats)}</span>
-            </div>
+            <button class="destination-row" data-destination="${place.id}" type="button">
+              <span class="destination-name"><strong>${place.name}</strong><small>Rating ${place.rating} · ${promotionText(place, data.placesWithStats)}</small></span>
+              <span class="destination-metric"><small>Visits</small>${place.stat.visitCount.toLocaleString("en-IN")}</span>
+              <span class="destination-metric"><small>Avg dwell</small>${place.stat.averageDwellMinutes} min</span>
+              <span class="destination-metric"><small>Peak</small>${place.stat.peakHour}</span>
+              <span class="destination-metric status-${place.stat.crowdLevel}"><small>Crowd</small>${place.stat.crowdLevel.toUpperCase()}</span>
+            </button>
           `).join("")}
         </div>
       </section>
@@ -363,7 +365,7 @@ function renderDestinations(state, data) {
       <section class="card span-12">${renderMap(state, data)}</section>
       <section class="card pad span-5">
         <h2>Destinations</h2>
-        ${renderDestinationList(data.placesWithStats)}
+        ${renderDestinationList(data.placesWithStats, state.selectedDestination)}
       </section>
       <section class="card pad span-7" id="destination-detail" tabindex="-1">${renderDestinationDetail(selected, data)}</section>
     </section>
@@ -442,26 +444,26 @@ function renderActionCard(item) {
   `;
 }
 
-function renderDestinationList(placesWithStats) {
+function renderDestinationList(placesWithStats, selectedId) {
   return `
     <div class="destination-list" role="list">
       <div class="destination-list-header" aria-hidden="true">
         <span>Destination</span><span>Visits</span><span>Avg dwell</span><span>Peak</span><span>Crowd</span>
       </div>
-      ${placesWithStats.map(renderDestinationRow).join("")}
+      ${placesWithStats.map((place) => renderDestinationRow(place, selectedId)).join("")}
     </div>
   `;
 }
 
-function renderDestinationRow(place) {
+function renderDestinationRow(place, selectedId) {
+  const selected = place.id === selectedId ? " selected" : "";
   return `
-    <button class="destination-row" data-destination="${place.id}" type="button">
-      <span class="destination-name"><strong>${place.name}</strong><small>${place.category} - ${place.stat.dominantActivity}</small></span>
+    <button class="destination-row${selected}" data-destination="${place.id}" type="button">
+      <span class="destination-name"><strong>${place.name}</strong><small>${place.category} · ${place.stat.dominantActivity}</small></span>
       <span class="destination-metric"><small>Visits</small>${displayValue(place.stat, place.stat.visitCount.toLocaleString("en-IN"))}</span>
       <span class="destination-metric"><small>Avg dwell</small>${place.stat.averageDwellMinutes} min</span>
       <span class="destination-metric"><small>Peak</small>${place.stat.peakHour}</span>
       <span class="destination-metric status-${place.stat.crowdLevel}"><small>Crowd</small>${place.stat.crowdLevel.toUpperCase()}</span>
-      <span class="destination-action">${destinationRecommendation(place)}</span>
     </button>
   `;
 }
@@ -471,7 +473,7 @@ function renderDestinationDetail(place, data) {
   const risk = data.risks.find((item) => item.placeId === place.id);
   const mobility = mobilityForDestination(place.id, data.mobility);
   const health = destinationHealth(place, data.risks, data.mobility);
-  const action = data.actions.find((item) => item.location === place.name);
+  const placeActions = data.actions.filter((item) => item.location === place.name).slice(0, 3);
   return `
     <h2>${place.name}</h2>
     <div class="detail-layout">
@@ -503,7 +505,13 @@ function renderDestinationDetail(place, data) {
         <div class="insight"><strong>Infrastructure</strong><span>${mobility ? mobility.recommendation : "No high mobility priority in demo data."}</span></div>
         <div class="insight"><strong>Safety</strong><span>${risk ? risk.suggestedResponse : "No elevated advisory risk in demo data."}</span></div>
         <div class="insight"><strong>Nearby alternatives</strong><span>${alternatives || "No alternatives configured."}</span></div>
-        ${action ? `<div class="insight"><strong>Recommended Action</strong><span>${action.recommendedAction}</span><span class="score-pill">Priority score: ${action.priorityScore}/100</span></div>` : ""}
+        ${placeActions.map((item) => `
+          <div class="insight">
+            <strong>${item.category} · ${item.priority.toUpperCase()}</strong>
+            <span>${item.recommendedAction}</span>
+            <span class="score-pill">Priority score: ${item.priorityScore}/100</span>
+          </div>
+        `).join("")}
       </div>
     </div>
   `;
@@ -593,15 +601,14 @@ function renderSchematicMap(state, data) {
 
 function renderMap(state, data) {
   const selected = data.selected;
-  const action = data.actions.find((item) => item.location === selected.name);
   return `
     <div class="map-wrap">
       <div class="live-map" data-leaflet-map role="application" aria-label="Interactive aggregated tourism crowd map"></div>
       <div class="map-panel">
         <div class="label">${DATA_SOURCE} - ${DATA_SOURCE_DETAIL}</div>
         <h3>${selected.name}</h3>
-        <p>Visits: <strong>${selected.stat.visitCount.toLocaleString("en-IN")}</strong> - Crowd: <strong class="status-${selected.stat.crowdLevel}">${selected.stat.crowdLevel.toUpperCase()}</strong></p>
-        <p>${action?.recommendedAction || destinationRecommendation(selected)}</p>
+        <p>Visits: <strong>${selected.stat.visitCount.toLocaleString("en-IN")}</strong> · Dwell: <strong>${selected.stat.averageDwellMinutes} min</strong> · Crowd: <strong class="status-${selected.stat.crowdLevel}">${selected.stat.crowdLevel.toUpperCase()}</strong></p>
+        <p><strong>Why this matters:</strong> ${whyThisMatters(selected, data.mobility)}</p>
         <div class="map-legend" aria-label="Crowd level legend">
           <span class="legend-item low">Low</span><span class="legend-item moderate">Moderate</span><span class="legend-item high">High</span><span class="legend-item critical">Critical</span>
         </div>
@@ -623,6 +630,7 @@ function mapPopup(place, action) {
       <span>Peak: ${escapeHtml(place.stat.peakHour)}</span>
       <span>Crowd: ${escapeHtml(place.stat.crowdLevel.toUpperCase())}</span>
       <span>Trend: ${place.stat.trendPercent > 0 ? "+" : ""}${escapeHtml(place.stat.trendPercent)}%</span>
+      <span>Activity: ${escapeHtml(place.stat.dominantActivity)}</span>
       <span class="popup-action"><b>Recommended:</b> ${escapeHtml(action?.recommendedAction || destinationRecommendation(place))}</span>
     </div>
   `;

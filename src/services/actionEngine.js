@@ -120,6 +120,30 @@ export function buildActionCenter(placesWithStats, risks, mobility) {
         fieldValidationStatus: "Requires field validation",
         scoreExplanation: `Visitor volume ${volumeScore}/100 + crowd ${crowdScore[place.stat.crowdLevel]}/100 + trend ${trendScore}/100${move ? ` + mobility ${movementScore}/100` : ""}.`
       });
+
+      const underusedAlt = alt.find((candidate) => candidate.stat.visitCount < 3500 && candidate.stat.crowdLevel === "low");
+      if (underusedAlt) {
+        const redistributeScore = clamp(score * 0.92 + 6);
+        actions.push({
+          id: `redistribute-${place.id}`,
+          title: `Redistribute visitors from ${place.name} to ${underusedAlt.name}`,
+          location: place.name,
+          category: "Visitor Redistribution",
+          priority: priorityFromScore(redistributeScore),
+          priorityScore: redistributeScore,
+          evidence: [
+            `Observed: ${place.stat.crowdLevel} crowd at ${place.name} during ${place.stat.peakHour}`,
+            `${place.stat.visitCount.toLocaleString("en-IN")} aggregated demo visits`,
+            `Nearby lower-pressure option: ${underusedAlt.name} (${underusedAlt.stat.visitCount.toLocaleString("en-IN")} visits, ${underusedAlt.stat.crowdLevel} crowd)`,
+            `Inferred: Potential visitor concentration imbalance`
+          ],
+          recommendedAction: `Promote ${underusedAlt.name} during ${place.stat.peakHour} via timed messaging, signage and partner promotions; validate capacity before redirecting flows.`,
+          expectedImpact: "Potentially reduce peak pressure at the primary destination while growing sustainable visitation nearby.",
+          dataConfidence: confidence,
+          fieldValidationStatus: "Requires field validation",
+          scoreExplanation: `High crowd pressure + underused nearby destination + peak concentration.`
+        });
+      }
     }
 
     if (place.stat.visitCount < 3000 && place.rating >= 4.6) {
