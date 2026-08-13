@@ -26,7 +26,27 @@ function relatedRisk(place, risks) {
 }
 
 function relatedMobility(place, mobility) {
-  return mobility.find((item) => item.connectedPlaceIds.includes(place.id));
+  return mobility
+    .filter((item) => item.connectedPlaceIds.includes(place.id))
+    .sort((a, b) => (b.roadPressurePercent || b.pressurePercent) - (a.roadPressurePercent || a.pressurePercent))[0];
+}
+
+function mobilityScore(mobility) {
+  if (!mobility) return 0;
+  return Math.round((mobility.roadPressurePercent || mobility.pressurePercent) * 0.6 + Math.max(0, mobility.delayPercent || 0) * 1.2);
+}
+
+function mobilityEvidence(mobility) {
+  if (!mobility) return [];
+  const evidence = [
+    `${mobility.tripCount.toLocaleString("en-IN")} aggregated demo trips`,
+    `Observed: ${mobility.averageTravelMinutes} min average travel during ${mobility.peakWindow}`
+  ];
+  if (mobility.delayPercent !== null && mobility.delayPercent !== undefined) {
+    evidence.push(`Calculated: ${mobility.delayPercent > 0 ? "+" : ""}${mobility.delayPercent}% travel delay relative to demo baseline`);
+  }
+  evidence.push(`Inferred: ${mobility.inferredSignals?.[0] || "Potential corridor pressure"}`);
+  return evidence;
 }
 
 function alternatives(place, placesWithStats) {
@@ -44,7 +64,7 @@ export function destinationHealth(place, risks, mobility) {
   const trend = clamp(50 + place.stat.trendPercent);
   const crowdPenalty = crowdScore[place.stat.crowdLevel] * 0.32;
   const riskPenalty = risk ? riskScore[risk.level] * 0.24 : 4;
-  const mobilityPenalty = move ? move.pressurePercent * 0.16 : 4;
+  const mobilityPenalty = move ? (move.roadPressurePercent || move.pressurePercent) * 0.16 : 4;
   const score = clamp((visitation + rating + dwell + trend) / 4 + 22 - crowdPenalty - riskPenalty - mobilityPenalty);
   const good = [];
   const warning = [];
@@ -54,7 +74,7 @@ export function destinationHealth(place, risks, mobility) {
   if (place.stat.trendPercent > 8) good.push("Growing visits");
   if (place.stat.crowdLevel === "low" || place.stat.crowdLevel === "moderate") good.push("Manageable crowd pressure");
   if (place.stat.crowdLevel === "high" || place.stat.crowdLevel === "critical") warning.push(`Peak-hour ${place.stat.crowdLevel} crowd pressure`);
-  if (move && move.pressurePercent >= 70) warning.push("Tourism corridor pressure requires evaluation");
+  if (move && (move.roadPressurePercent || move.pressurePercent) >= 70) warning.push("Potential tourism corridor pressure requires evaluation");
   if (risk) warning.push(`${risk.level} advisory risk intersects with tourism activity`);
   if (place.stat.visitCount < 3000 && place.rating >= 4.6) opportunity.push("High-potential under-visited destination");
   if (place.stat.averageDwellMinutes > 70) opportunity.push("Long dwell time supports facility and amenity review");
@@ -74,9 +94,10 @@ export function buildActionCenter(placesWithStats, risks, mobility) {
     const volumeScore = clamp(place.stat.visitCount / 150);
     const trendScore = clamp(50 + place.stat.trendPercent);
     const confidence = place.stat.contributorCount > 150 ? "High" : place.stat.contributorCount > 60 ? "Medium" : "Low";
+    const movementScore = mobilityScore(move);
 
     if (place.stat.crowdLevel === "critical" || place.stat.crowdLevel === "high") {
-      const score = clamp((crowdScore[place.stat.crowdLevel] + volumeScore + trendScore + (risk ? riskScore[risk.level] : 20)) / 4 + 12);
+      const score = clamp((crowdScore[place.stat.crowdLevel] + volumeScore + trendScore + (risk ? riskScore[risk.level] : 20) + movementScore) / 5 + 12);
       actions.push({
         id: `crowd-${place.id}`,
         title: `Review peak-hour crowd management at ${place.name}`,
@@ -88,7 +109,8 @@ export function buildActionCenter(placesWithStats, risks, mobility) {
           `${place.stat.visitCount.toLocaleString("en-IN")} aggregated demo visits`,
           `Peak concentration: ${place.stat.peakHour}`,
           `Crowd level: ${place.stat.crowdLevel}`,
-          `Visit trend: ${place.stat.trendPercent > 0 ? "+" : ""}${place.stat.trendPercent}%`
+          `Visit trend: ${place.stat.trendPercent > 0 ? "+" : ""}${place.stat.trendPercent}%`,
+          ...mobilityEvidence(move).slice(0, 2)
         ],
         recommendedAction: highestAlt
           ? `Promote ${highestAlt.name}, review timed-entry/crowd-routing measures and deploy temporary signage during ${place.stat.peakHour}.`
@@ -96,7 +118,7 @@ export function buildActionCenter(placesWithStats, risks, mobility) {
         expectedImpact: "Reduce peak crowd pressure and distribute demand across nearby destinations.",
         dataConfidence: confidence,
         fieldValidationStatus: "Requires field validation",
-        scoreExplanation: `Impact ${volumeScore}/100 + crowd ${crowdScore[place.stat.crowdLevel]}/100 + trend ${trendScore}/100.`
+        scoreExplanation: `Visitor volume ${volumeScore}/100 + crowd ${crowdScore[place.stat.crowdLevel]}/100 + trend ${trendScore}/100${move ? ` + mobility ${movementScore}/100` : ""}.`
       });
     }
 
@@ -124,26 +146,49 @@ export function buildActionCenter(placesWithStats, risks, mobility) {
       });
     }
 
-    if (move && move.pressurePercent >= 70) {
-      const score = clamp((move.pressurePercent + volumeScore + crowdScore[place.stat.crowdLevel]) / 3 + 8);
+    if (move && (move.roadPressurePercent || move.pressurePercent) >= 70) {
+      const score = clamp(((move.roadPressurePercent || move.pressurePercent) + volumeScore + crowdScore[place.stat.crowdLevel] + Math.max(0, move.delayPercent || 0)) / 4 + 8);
       actions.push({
         id: `infra-${place.id}`,
-        title: `Evaluate tourism infrastructure around ${place.name}`,
+        title: `Evaluate potential road and access pressure near ${place.name}`,
         location: place.name,
-        category: "Infrastructure",
+        category: "Road/Traffic Pressure",
         priority: priorityFromScore(score),
         priorityScore: score,
         evidence: [
-          `${move.corridorName} pressure: ${move.pressurePercent}%`,
-          `Peak movement window: ${move.peakWindow}`,
+          ...mobilityEvidence(move),
+          `Corridor concentration: ${move.corridorConcentrationPercent}%`,
           `Destination crowd level: ${place.stat.crowdLevel}`,
           `${place.stat.visitCount.toLocaleString("en-IN")} aggregated demo visits`
         ],
-        recommendedAction: "Consider evaluating road-capacity management, pedestrian crossings, lighting, signage, parking controls or shuttle/public-transport connectivity.",
-        expectedImpact: "Improve visitor flow, reduce peak-hour friction and support safer tourism access.",
+        recommendedAction: "Evaluate alternate routing, traffic signal timing, pedestrian crossings, parking guidance and additional public-transport or shuttle capacity. Field validation is required before capacity decisions.",
+        expectedImpact: "Potentially reduce peak travel delay and improve visitor access.",
         dataConfidence: confidence,
         fieldValidationStatus: "Requires field validation",
-        scoreExplanation: `Movement pressure ${move.pressurePercent}/100 + visitor volume ${volumeScore}/100 + crowd pressure.`
+        scoreExplanation: `Road pressure ${move.roadPressurePercent || move.pressurePercent}/100 + travel delay ${move.delayPercent || 0}% + visitor volume ${volumeScore}/100 + crowd pressure.`
+      });
+    }
+
+    if (move && move.transitPressurePercent >= 55) {
+      const score = clamp((move.transitPressurePercent + volumeScore + Math.max(0, move.averageStopDwellMinutes || 0)) / 3 + 6);
+      actions.push({
+        id: `transit-${place.id}`,
+        title: `Review potential transit pressure serving ${place.name}`,
+        location: place.name,
+        category: "Public Transit Pressure",
+        priority: priorityFromScore(score),
+        priorityScore: score,
+        evidence: [
+          `${move.tripCount.toLocaleString("en-IN")} aggregated demo trips on ${move.corridorName}`,
+          `Observed: ${move.transitConcentrationPercent}% transit-area concentration during ${move.peakWindow}`,
+          `Calculated: ${move.averageStopDwellMinutes} min average dwell at the transition zone`,
+          "Inferred: Potential transit pressure"
+        ],
+        recommendedAction: "Evaluate service frequency, passenger holding space, last-mile wayfinding and staggered visitor messaging; validate service capacity with field operations.",
+        expectedImpact: "Potentially improve peak transfer flow and reduce waiting pressure.",
+        dataConfidence: move.confidence || confidence,
+        fieldValidationStatus: "Requires field validation",
+        scoreExplanation: `Transit concentration ${move.transitConcentrationPercent}/100 + stop dwell ${move.averageStopDwellMinutes} min + visitor volume ${volumeScore}/100.`
       });
     }
 
@@ -159,9 +204,10 @@ export function buildActionCenter(placesWithStats, risks, mobility) {
         evidence: [
           `${place.stat.visitCount.toLocaleString("en-IN")} aggregated demo visits`,
           `Average dwell: ${place.stat.averageDwellMinutes} minutes`,
-          `Crowd level: ${place.stat.crowdLevel}`
+          `Crowd level: ${place.stat.crowdLevel}`,
+          ...(move?.privateVehiclePercent >= 55 ? [`Observed: ${move.privateVehiclePercent}% private-vehicle share on the connected demo corridor`] : [])
         ],
-        recommendedAction: "Evaluate toilets, drinking water, shade, seating, accessibility, waste-management and visitor amenity capacity.",
+        recommendedAction: `Facility capacity review recommended: evaluate toilets, drinking water, shade, seating, accessibility, waste-management and visitor amenities.${move?.privateVehiclePercent >= 55 ? " Also review parking or park-and-ride access." : ""}`,
         expectedImpact: "Improve visitor comfort and reduce operational stress at popular destinations.",
         dataConfidence: confidence,
         fieldValidationStatus: "Requires field validation",
@@ -169,8 +215,31 @@ export function buildActionCenter(placesWithStats, risks, mobility) {
       });
     }
 
+    if (move && move.privateVehiclePercent >= 55 && place.stat.visitCount > 7000) {
+      const score = clamp((move.privateVehiclePercent + volumeScore + (move.roadPressurePercent || move.pressurePercent)) / 3 + 4);
+      actions.push({
+        id: `parking-${place.id}`,
+        title: `Review parking and visitor access at ${place.name}`,
+        location: place.name,
+        category: "Parking & Access",
+        priority: priorityFromScore(score),
+        priorityScore: score,
+        evidence: [
+          `Observed: ${move.privateVehiclePercent}% private-vehicle share on ${move.corridorName}`,
+          `${place.stat.visitCount.toLocaleString("en-IN")} aggregated demo visits`,
+          `Calculated road pressure: ${move.roadPressurePercent || move.pressurePercent}% during ${move.peakWindow}`,
+          "Inferred: Potential parking and access pressure"
+        ],
+        recommendedAction: "Review parking guidance, pickup/drop-off operations and park-and-ride or shuttle options; validate available parking supply before changes.",
+        expectedImpact: "Potentially reduce vehicle circulation and improve arrival flow.",
+        dataConfidence: move.confidence || confidence,
+        fieldValidationStatus: "Requires field validation",
+        scoreExplanation: `Private-vehicle share ${move.privateVehiclePercent}% + road pressure ${move.roadPressurePercent || move.pressurePercent}/100 + visitor volume ${volumeScore}/100.`
+      });
+    }
+
     if (risk && (place.stat.crowdLevel === "high" || place.stat.crowdLevel === "critical" || risk.level === "high")) {
-      const score = clamp((riskScore[risk.level] + crowdScore[place.stat.crowdLevel] + volumeScore) / 3 + 10);
+      const score = clamp((riskScore[risk.level] + crowdScore[place.stat.crowdLevel] + volumeScore + movementScore) / 4 + 10);
       actions.push({
         id: `risk-${place.id}`,
         title: `Coordinate tourism safety advisory for ${place.name}`,
@@ -182,13 +251,14 @@ export function buildActionCenter(placesWithStats, risks, mobility) {
           `Risk level: ${risk.level}`,
           risk.reason,
           `Affected activity: ${risk.affectedActivity}`,
-          `Crowd level: ${place.stat.crowdLevel}`
+          `Crowd level: ${place.stat.crowdLevel}`,
+          ...(move ? [`Potential mobility pressure: ${move.roadPressureLevel || move.pressurePercent}`] : [])
         ],
         recommendedAction: risk.suggestedResponse,
         expectedImpact: "Reduce visitor exposure to advisory risk and improve response coordination.",
         dataConfidence: confidence,
         fieldValidationStatus: "Requires field validation",
-        scoreExplanation: `Risk ${riskScore[risk.level]}/100 + crowd ${crowdScore[place.stat.crowdLevel]}/100 + visitor volume.`
+        scoreExplanation: `Risk ${riskScore[risk.level]}/100 + crowd ${crowdScore[place.stat.crowdLevel]}/100 + visitor volume ${volumeScore}/100${move ? ` + mobility ${movementScore}/100` : ""}.`
       });
     }
   });

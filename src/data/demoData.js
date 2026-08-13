@@ -1,5 +1,6 @@
 export const MIN_AGGREGATION_THRESHOLD = 5;
 export const DATA_SOURCE = "DEMO DATA";
+export const DATA_SOURCE_DETAIL = "simulated consenting travel observations";
 
 export const places = [
   { id: "central-heritage", name: "Central Heritage District", region: "Bengaluru", category: "Heritage", lat: 12.9716, lng: 77.5946, rating: 4.6, capacity: 14000, alternatives: ["cubbon-park", "kr-market"] },
@@ -17,20 +18,20 @@ export const places = [
 ];
 
 export const stats = [
-  ["central-heritage", 12420, 54, "5-8 PM", "high", 18, 21, 4.4, 216],
-  ["church-street", 10980, 88, "7-10 PM", "critical", 14, 34, 4.2, 180],
-  ["cubbon-park", 7680, 62, "8-11 AM", "moderate", 8, 29, 4.6, 132],
-  ["kr-market", 6410, 42, "10 AM-1 PM", "moderate", -4, 18, 4.1, 109],
-  ["lalbagh", 7210, 71, "7-10 AM", "moderate", 5, 25, 4.6, 122],
-  ["indiranagar-food", 8370, 79, "8-11 PM", "high", 11, 31, 4.3, 140],
-  ["panambur-beach", 13140, 73, "5-8 PM", "critical", 22, 19, 4.0, 210],
-  ["tannirbhavi-beach", 4980, 67, "4-7 PM", "moderate", 9, 15, 4.5, 87],
-  ["lake-viewpoint", 1480, 59, "4-6 PM", "low", 17, 9, 4.7, 34],
-  ["coastal-fort", 2860, 52, "11 AM-2 PM", "low", 12, 13, 4.6, 44],
-  ["western-ghat-view", 6920, 61, "3-6 PM", "high", 16, 17, 4.5, 112],
-  ["coffee-estate-trail", 1720, 93, "9 AM-12 PM", "low", 19, 10, 4.8, 38]
-].map(([placeId, visitCount, averageDwellMinutes, peakHour, crowdLevel, trendPercent, repeatVisitPercent, satisfactionProxy, contributorCount]) => ({
-  placeId, date: "2026-08-13", visitCount, averageDwellMinutes, peakHour, crowdLevel, trendPercent, repeatVisitPercent, satisfactionProxy, contributorCount
+  ["central-heritage", 12420, 54, "5-8 PM", "high", 18, 21, 4.4, 216, "Heritage walks"],
+  ["church-street", 10980, 88, "7-10 PM", "critical", 14, 34, 4.2, 180, "Dining and nightlife"],
+  ["cubbon-park", 7680, 62, "8-11 AM", "moderate", 8, 29, 4.6, 132, "Recreation"],
+  ["kr-market", 6410, 42, "10 AM-1 PM", "moderate", -4, 18, 4.1, 109, "Market visits"],
+  ["lalbagh", 7210, 71, "7-10 AM", "moderate", 5, 25, 4.6, 122, "Garden visits"],
+  ["indiranagar-food", 8370, 79, "8-11 PM", "high", 11, 31, 4.3, 140, "Dining and cafes"],
+  ["panambur-beach", 13140, 73, "5-8 PM", "critical", 22, 19, 4.0, 210, "Beach recreation"],
+  ["tannirbhavi-beach", 4980, 67, "4-7 PM", "moderate", 9, 15, 4.5, 87, "Beach recreation"],
+  ["lake-viewpoint", 1480, 59, "4-6 PM", "low", 17, 9, 4.7, 34, "Scenic viewing"],
+  ["coastal-fort", 2860, 52, "11 AM-2 PM", "low", 12, 13, 4.6, 44, "Heritage visits"],
+  ["western-ghat-view", 6920, 61, "3-6 PM", "high", 16, 17, 4.5, 112, "Scenic viewing"],
+  ["coffee-estate-trail", 1720, 93, "9 AM-12 PM", "low", 19, 10, 4.8, 38, "Nature trail visits"]
+].map(([placeId, visitCount, averageDwellMinutes, peakHour, crowdLevel, trendPercent, repeatVisitPercent, satisfactionProxy, contributorCount, dominantActivity]) => ({
+  placeId, date: "2026-08-13", visitCount, averageDwellMinutes, peakHour, crowdLevel, trendPercent, repeatVisitPercent, satisfactionProxy, contributorCount, dominantActivity
 }));
 
 export const visitsOverTime = [
@@ -48,9 +49,21 @@ export const riskSignals = [
 ];
 
 export const mobilityInsights = [
-  { id: "mob-1", corridorName: "Bengaluru CBD -> Church Street", connectedPlaceIds: ["central-heritage", "church-street"], pressurePercent: 82, peakWindow: "6-10 PM", recommendation: "Potential infrastructure priority: improve wayfinding, pedestrian holding areas and last-mile transit messaging." },
-  { id: "mob-2", corridorName: "Coastal Highway -> Panambur Beach Zone", connectedPlaceIds: ["panambur-beach", "tannirbhavi-beach"], pressurePercent: 88, peakWindow: "4-8 PM", recommendation: "Consider staggered parking guidance, signage and pedestrian safety infrastructure." },
-  { id: "mob-3", corridorName: "Hill Access Road -> Western Ghat Viewpoint", connectedPlaceIds: ["western-ghat-view", "coffee-estate-trail"], pressurePercent: 73, peakWindow: "3-6 PM", recommendation: "Potential infrastructure priority: promote alternative return windows and improve pull-off/parking management." }
+  {
+    id: "mob-1", corridorId: "blr-cbd-church-street", corridorName: "Bengaluru CBD -> Church Street", originZone: "Central Heritage District", destinationZone: "Church Street Entertainment Mile", connectedPlaceIds: ["central-heritage", "church-street"],
+    tripCount: 8420, averageTravelMinutes: 32, baselineTravelMinutes: 24, averageStopDwellMinutes: 22, corridorConcentrationPercent: 76, transitConcentrationPercent: 68, privateVehiclePercent: 54, publicTransportPercent: 35, pressurePercent: 82, peakWindow: "6-10 PM", transportMode: "Mixed road and transit", confidence: "Medium",
+    recommendation: "Observed demand relative to movement indicators suggests potential corridor pressure; evaluate pedestrian holding areas, wayfinding and last-mile transit support."
+  },
+  {
+    id: "mob-2", corridorId: "coastal-highway-panambur", corridorName: "Coastal Highway -> Panambur Beach Zone", originZone: "Coastal Highway", destinationZone: "Panambur Beach Zone", connectedPlaceIds: ["panambur-beach", "tannirbhavi-beach"],
+    tripCount: 9180, averageTravelMinutes: 39, baselineTravelMinutes: 29, averageStopDwellMinutes: 16, corridorConcentrationPercent: 82, transitConcentrationPercent: 38, privateVehiclePercent: 63, publicTransportPercent: 26, pressurePercent: 88, peakWindow: "4-8 PM", transportMode: "Road access", confidence: "Medium",
+    recommendation: "Observed peak road demand and travel delay suggest a potential access constraint; evaluate parking guidance, park-and-ride and pedestrian safety measures."
+  },
+  {
+    id: "mob-3", corridorId: "hill-access-western-ghat", corridorName: "Hill Access Road -> Western Ghat Viewpoint", originZone: "Hill Access Road", destinationZone: "Western Ghat Viewpoint", connectedPlaceIds: ["western-ghat-view", "coffee-estate-trail"],
+    tripCount: 5160, averageTravelMinutes: 43, baselineTravelMinutes: 35, averageStopDwellMinutes: 14, corridorConcentrationPercent: 71, transitConcentrationPercent: 24, privateVehiclePercent: 71, publicTransportPercent: 18, pressurePercent: 73, peakWindow: "3-6 PM", transportMode: "Private vehicle dominant", confidence: "Low",
+    recommendation: "Observed movement concentration suggests a potential road and parking pressure window; validate capacity, signal timing and alternate return routing in the field."
+  }
 ];
 
 export const recommendations = [

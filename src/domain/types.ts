@@ -48,6 +48,7 @@ export interface AggregatedPlaceStats {
   trendPercent: number;
   repeatVisitPercent: number;
   satisfactionProxy: number;
+  dominantActivity: string;
 }
 
 export interface CrowdSnapshot {
@@ -70,10 +71,23 @@ export interface RiskSignal {
 
 export interface MobilityInsight {
   id: string;
+  corridorId: string;
   corridorName: string;
+  originZone: string;
+  destinationZone: string;
   connectedPlaceIds: string[];
+  tripCount: number;
+  averageTravelMinutes: number;
+  baselineTravelMinutes?: number;
+  averageStopDwellMinutes?: number;
+  corridorConcentrationPercent: number;
+  transitConcentrationPercent?: number;
+  privateVehiclePercent?: number;
+  publicTransportPercent?: number;
   pressurePercent: number;
   peakWindow: string;
+  transportMode: string;
+  confidence: "Low" | "Medium" | "High";
   recommendation: string;
 }
 
@@ -91,7 +105,7 @@ export interface TourismAction {
   id: string;
   title: string;
   location: string;
-  category: "Crowd Management" | "Tourism Promotion" | "Infrastructure" | "Facility Improvement" | "Safety & Risk";
+  category: "Crowd Management" | "Tourism Promotion" | "Infrastructure" | "Facility Improvement" | "Safety & Risk" | "Road/Traffic Pressure" | "Public Transit Pressure" | "Parking & Access" | "Visitor Redistribution";
   priority: "urgent" | "high" | "opportunity" | "monitor";
   priorityScore: number;
   evidence: string[];

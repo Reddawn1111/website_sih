@@ -7,8 +7,11 @@ import {
   tourismOpportunities
 } from "./services/intelligenceService.js";
 import { buildActionCenter, destinationHealth, groupedActions, simulateImpact } from "./services/actionEngine.js";
-import { DATA_SOURCE, MIN_AGGREGATION_THRESHOLD } from "./data/demoData.js";
+import { deriveMobilityMetrics, mobilityForDestination, mobilityPressureSummary, whyThisMatters } from "./services/mobilityService.js";
+import { DATA_SOURCE, DATA_SOURCE_DETAIL, MIN_AGGREGATION_THRESHOLD } from "./data/demoData.js";
 import { displayValue, privacySummary } from "./services/privacyService.js";
+
+let activeMaps = [];
 
 const routeLabels = {
   dashboard: "Dashboard",
@@ -54,6 +57,7 @@ function renderHeader(state) {
         <p>Government command-center dashboard for anonymised tourism, crowd, mobility and risk intelligence.</p>
         <div class="chips">
           <span class="source-pill">${DATA_SOURCE}</span>
+          <span class="chip">${DATA_SOURCE_DETAIL}</span>
           <span class="chip">Region: ${state.region}</span>
           <span class="chip">Date range: ${state.dateRange}</span>
           <span class="chip">Freshness: 12 min ago</span>
@@ -92,11 +96,20 @@ function filteredData(state, data) {
     .filter((place) => state.category === "All Categories" || place.category === state.category)
     .filter((place) => state.crowd === "All Crowd Levels" || place.stat.crowdLevel === state.crowd);
 
+  const mobility = deriveMobilityMetrics(data.mobility)
+    .filter((item) => item.connectedPlaceIds.some((id) => placesWithStats.some((place) => place.id === id)));
+  const risks = data.risks.filter((risk) => placesWithStats.some((place) => place.id === risk.placeId));
+  const actions = buildActionCenter(placesWithStats, risks, mobility);
+  const selected = placesWithStats.find((place) => place.id === state.selectedDestination) || placesWithStats[0];
+
   return {
     ...data,
     placesWithStats,
-    risks: data.risks.filter((risk) => placesWithStats.some((place) => place.id === risk.placeId)),
-    mobility: data.mobility.filter((item) => item.connectedPlaceIds.some((id) => placesWithStats.some((place) => place.id === id))),
+    risks,
+    mobility,
+    actions,
+    selected,
+    mobilitySummary: mobilityPressureSummary(mobility),
     recommendations: data.recommendations.filter((item) => !item.placeId || placesWithStats.some((place) => place.id === item.placeId))
   };
 }
@@ -134,7 +147,7 @@ function renderEmptyState() {
 
 function renderDashboard(state, data) {
   const insightItems = keyInsights(data.placesWithStats, data.risks, data.mobility).map((text) => `<div class="insight">${text}</div>`).join("");
-  const actions = buildActionCenter(data.placesWithStats, data.risks, data.mobility);
+  const actions = data.actions;
   return `
     <section class="grid">
       ${kpis(data.placesWithStats, data.risks).map(renderKpi).join("")}
@@ -143,6 +156,7 @@ function renderDashboard(state, data) {
         <div class="insight-list">${insightItems}</div>
       </section>
       <section class="card span-7">${renderMap(state, data)}</section>
+      <section class="card pad span-12">${renderMobilityPressure(data.mobilitySummary)}</section>
       <section class="card pad span-6">${renderLineChart("Visits over time", data.visitsOverTime, "Visits")}</section>
       <section class="card pad span-6">${renderHourlyCurve(data.hourlyCurve)}</section>
       <section class="card pad span-12">${renderActionSummary(actions)}</section>
@@ -181,6 +195,21 @@ function renderKpi(item) {
   `;
 }
 
+function renderMobilityPressure(summary) {
+  if (!summary) {
+    return `<div class="empty-mobility">Insufficient sample size for aggregated mobility indicators.</div>`;
+  }
+  return `
+    <div class="mobility-pressure-grid">
+      <div><span class="label">Road pressure</span><strong class="status-${summary.roadPressure}">${summary.roadPressure.toUpperCase()}</strong></div>
+      <div><span class="label">Transit pressure</span><strong class="status-${summary.transitPressure}">${summary.transitPressure === "Insufficient sample size" ? summary.transitPressure : summary.transitPressure.toUpperCase()}</strong></div>
+      <div><span class="label">Peak visitor concentration</span><strong>${summary.peakWindow}</strong></div>
+      <div><span class="label">Average travel delay</span><strong>+${summary.averageDelay}%</strong></div>
+      <div class="mobility-corridor"><span class="label">Top movement corridor</span><strong>${summary.topCorridor}</strong></div>
+    </div>
+  `;
+}
+
 function renderTourism(state, data) {
   const categories = categoryDistribution(data.placesWithStats);
   return `
@@ -191,7 +220,7 @@ function renderTourism(state, data) {
       <section class="card pad span-6">${renderDestinationRanking(data.placesWithStats)}</section>
       <section class="card pad span-12">
         <h2>Destination Intelligence</h2>
-        <div class="destination-list">${data.placesWithStats.map(renderDestinationRow).join("")}</div>
+        ${renderDestinationList(data.placesWithStats)}
       </section>
     </section>
   `;
@@ -199,7 +228,7 @@ function renderTourism(state, data) {
 
 function renderCrowd(state, data) {
   const hot = [...data.placesWithStats].sort((a, b) => b.stat.visitCount / b.capacity - a.stat.visitCount / a.capacity);
-  const actions = buildActionCenter(data.placesWithStats, data.risks, data.mobility).filter((item) => item.category === "Crowd Management");
+  const actions = data.actions.filter((item) => item.category === "Crowd Management" || item.category === "Visitor Redistribution");
   return `
     <section class="grid">
       <section class="card span-7">${renderMap(state, data)}</section>
@@ -247,20 +276,26 @@ function renderOpportunities(state, data) {
 }
 
 function renderMobility(state, data) {
-  const infraActions = buildActionCenter(data.placesWithStats, data.risks, data.mobility)
-    .filter((item) => item.category === "Infrastructure" || item.category === "Facility Improvement");
+  const infraActions = data.actions
+    .filter((item) => ["Infrastructure", "Facility Improvement", "Road/Traffic Pressure", "Public Transit Pressure", "Parking & Access"].includes(item.category));
   return `
     <section class="grid">
       <section class="card pad span-12">
+        <h2>Mobility Pressure</h2>
+        <p>Aggregate travel observations are shown separately from calculated metrics and inferred pressure signals. Field validation is required.</p>
+        ${renderMobilityPressure(data.mobilitySummary)}
+      </section>
+      <section class="card pad span-12">
         <h2>Tourism Mobility Hotspots</h2>
-        <p>Data-driven recommendation - field validation required. These are potential infrastructure priorities, not confirmed engineering conclusions.</p>
         <div class="recommendation-list">
           ${data.mobility.map((item) => `
             <div class="recommendation">
-              <span class="status-pill">${item.pressurePercent}% pressure</span>
+              <span class="status-pill status-${item.roadPressureLevel}">${item.roadPressureLevel.toUpperCase()}</span>
               <div>
                 <strong>${item.corridorName}</strong>
-                <p>Peak: ${item.peakWindow}. ${item.recommendation}</p>
+                <p>Observed: ${item.tripCount.toLocaleString("en-IN")} aggregated trips, ${item.averageTravelMinutes} min average travel, peak ${item.peakWindow}.</p>
+                <p>Calculated: ${item.delayPercent > 0 ? "+" : ""}${item.delayPercent}% delay relative to the demo baseline; ${item.roadPressurePercent}% road pressure.</p>
+                <p>Inferred: ${item.inferredSignals.join("; ") || "No elevated inferred signal"}. ${item.recommendation}</p>
               </div>
             </div>
           `).join("")}
@@ -305,7 +340,7 @@ function renderSafety(state, data) {
 }
 
 function renderRecommendations(state, data) {
-  const actions = buildActionCenter(data.placesWithStats, data.risks, data.mobility);
+  const actions = data.actions;
   return `
     <section class="grid">
       <section class="card pad span-12">
@@ -322,20 +357,21 @@ function renderRecommendations(state, data) {
 }
 
 function renderDestinations(state, data) {
-  const selected = data.placesWithStats.find((place) => place.id === state.selectedDestination) || data.placesWithStats[0];
+  const selected = data.selected;
   return `
     <section class="grid">
+      <section class="card span-12">${renderMap(state, data)}</section>
       <section class="card pad span-5">
         <h2>Destinations</h2>
-        <div class="destination-list">${data.placesWithStats.map(renderDestinationRow).join("")}</div>
+        ${renderDestinationList(data.placesWithStats)}
       </section>
-      <section class="card pad span-7">${renderDestinationDetail(selected, data)}</section>
+      <section class="card pad span-7" id="destination-detail" tabindex="-1">${renderDestinationDetail(selected, data)}</section>
     </section>
   `;
 }
 
 function renderActionCenter(state, data) {
-  const actions = buildActionCenter(data.placesWithStats, data.risks, data.mobility);
+  const actions = data.actions;
   return `
     <section class="grid">
       <section class="card pad span-12">
@@ -406,25 +442,36 @@ function renderActionCard(item) {
   `;
 }
 
+function renderDestinationList(placesWithStats) {
+  return `
+    <div class="destination-list" role="list">
+      <div class="destination-list-header" aria-hidden="true">
+        <span>Destination</span><span>Visits</span><span>Avg dwell</span><span>Peak</span><span>Crowd</span>
+      </div>
+      ${placesWithStats.map(renderDestinationRow).join("")}
+    </div>
+  `;
+}
+
 function renderDestinationRow(place) {
   return `
-    <div class="destination-row" data-destination="${place.id}">
-      <strong>${place.name}</strong>
-      <span>${place.category}</span>
-      <span>${displayValue(place.stat, place.stat.visitCount.toLocaleString("en-IN"))}</span>
-      <span>${place.stat.averageDwellMinutes} min</span>
-      <span>${place.stat.peakHour}</span>
-      <span class="status-${place.stat.crowdLevel}">${place.stat.crowdLevel.toUpperCase()}</span>
-      <span>${destinationRecommendation(place)}</span>
-    </div>
+    <button class="destination-row" data-destination="${place.id}" type="button">
+      <span class="destination-name"><strong>${place.name}</strong><small>${place.category} - ${place.stat.dominantActivity}</small></span>
+      <span class="destination-metric"><small>Visits</small>${displayValue(place.stat, place.stat.visitCount.toLocaleString("en-IN"))}</span>
+      <span class="destination-metric"><small>Avg dwell</small>${place.stat.averageDwellMinutes} min</span>
+      <span class="destination-metric"><small>Peak</small>${place.stat.peakHour}</span>
+      <span class="destination-metric status-${place.stat.crowdLevel}"><small>Crowd</small>${place.stat.crowdLevel.toUpperCase()}</span>
+      <span class="destination-action">${destinationRecommendation(place)}</span>
+    </button>
   `;
 }
 
 function renderDestinationDetail(place, data) {
   const alternatives = place.alternatives.map((id) => data.placesWithStats.find((item) => item.id === id)?.name).filter(Boolean).join(", ");
   const risk = data.risks.find((item) => item.placeId === place.id);
-  const mobility = data.mobility.find((item) => item.connectedPlaceIds.includes(place.id));
+  const mobility = mobilityForDestination(place.id, data.mobility);
   const health = destinationHealth(place, data.risks, data.mobility);
+  const action = data.actions.find((item) => item.location === place.name);
   return `
     <h2>${place.name}</h2>
     <div class="detail-layout">
@@ -434,6 +481,7 @@ function renderDestinationDetail(place, data) {
           <span class="chip">Rating ${place.rating}</span>
           <span class="chip">Crowd ${place.stat.crowdLevel}</span>
           <span class="chip">Trend ${place.stat.trendPercent > 0 ? "+" : ""}${place.stat.trendPercent}%</span>
+          <span class="chip">Activity: ${place.stat.dominantActivity}</span>
         </div>
         <div class="health-panel">
           <div class="kpi-value">${health.score}/100</div>
@@ -448,11 +496,14 @@ function renderDestinationDetail(place, data) {
         ${renderHourlyCurve(data.hourlyCurve)}
       </div>
       <div class="recommendation-list">
+        <div class="insight"><strong>Why This Matters</strong><span>${whyThisMatters(place, data.mobility)}</span></div>
+        <div class="insight"><strong>Approx. destination location</strong><span>${place.lat.toFixed(4)} N, ${place.lng.toFixed(4)} E - demonstration destination coordinate</span></div>
         <div class="insight"><strong>Crowd Management</strong><span>${destinationRecommendation(place)}</span></div>
         <div class="insight"><strong>Promotion</strong><span>${place.stat.visitCount < 3000 ? "Promote as hidden gem." : "Use timed promotion to distribute peaks."}</span></div>
         <div class="insight"><strong>Infrastructure</strong><span>${mobility ? mobility.recommendation : "No high mobility priority in demo data."}</span></div>
         <div class="insight"><strong>Safety</strong><span>${risk ? risk.suggestedResponse : "No elevated advisory risk in demo data."}</span></div>
         <div class="insight"><strong>Nearby alternatives</strong><span>${alternatives || "No alternatives configured."}</span></div>
+        ${action ? `<div class="insight"><strong>Recommended Action</strong><span>${action.recommendedAction}</span><span class="score-pill">Priority score: ${action.priorityScore}/100</span></div>` : ""}
       </div>
     </div>
   `;
@@ -511,7 +562,7 @@ function renderImpactSimulator(state, data) {
   `;
 }
 
-function renderMap(state, data) {
+function renderSchematicMap(state, data) {
   const zones = data.placesWithStats.map((place, index) => {
     const x = 90 + ((index * 83) % 710);
     const y = 70 + ((index * 117) % 290);
@@ -538,6 +589,95 @@ function renderMap(state, data) {
       </div>
     </div>
   `;
+}
+
+function renderMap(state, data) {
+  const selected = data.selected;
+  const action = data.actions.find((item) => item.location === selected.name);
+  return `
+    <div class="map-wrap">
+      <div class="live-map" data-leaflet-map role="application" aria-label="Interactive aggregated tourism crowd map"></div>
+      <div class="map-panel">
+        <div class="label">${DATA_SOURCE} - ${DATA_SOURCE_DETAIL}</div>
+        <h3>${selected.name}</h3>
+        <p>Visits: <strong>${selected.stat.visitCount.toLocaleString("en-IN")}</strong> - Crowd: <strong class="status-${selected.stat.crowdLevel}">${selected.stat.crowdLevel.toUpperCase()}</strong></p>
+        <p>${action?.recommendedAction || destinationRecommendation(selected)}</p>
+        <div class="map-legend" aria-label="Crowd level legend">
+          <span class="legend-item low">Low</span><span class="legend-item moderate">Moderate</span><span class="legend-item high">High</span><span class="legend-item critical">Critical</span>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>\"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" })[character]);
+}
+
+function mapPopup(place, action) {
+  return `
+    <div class="map-popup">
+      <strong>${escapeHtml(place.name)}</strong>
+      <span>${escapeHtml(place.stat.visitCount.toLocaleString("en-IN"))} aggregated visits</span>
+      <span>${escapeHtml(place.stat.averageDwellMinutes)} min avg dwell</span>
+      <span>Peak: ${escapeHtml(place.stat.peakHour)}</span>
+      <span>Crowd: ${escapeHtml(place.stat.crowdLevel.toUpperCase())}</span>
+      <span>Trend: ${place.stat.trendPercent > 0 ? "+" : ""}${escapeHtml(place.stat.trendPercent)}%</span>
+      <span class="popup-action"><b>Recommended:</b> ${escapeHtml(action?.recommendedAction || destinationRecommendation(place))}</span>
+    </div>
+  `;
+}
+
+function markerSize(visitCount) {
+  return Math.max(18, Math.min(34, Math.round(16 + visitCount / 850)));
+}
+
+export function destroyLeafletMaps() {
+  activeMaps.forEach((map) => map.remove());
+  activeMaps = [];
+}
+
+export function initializeLeafletMaps(state, data, onSelectDestination) {
+  if (!window.L) return;
+  const mapElement = document.querySelector("[data-leaflet-map]");
+  if (!mapElement || !data.placesWithStats.length) return;
+
+  const map = window.L.map(mapElement, { scrollWheelZoom: true, zoomControl: true, attributionControl: true });
+  window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 18,
+    attribution: "&copy; OpenStreetMap contributors"
+  }).addTo(map);
+
+  const bounds = window.L.latLngBounds(data.placesWithStats.map((place) => [place.lat, place.lng]));
+  const markers = new Map();
+  data.placesWithStats.forEach((place) => {
+    const action = data.actions.find((item) => item.location === place.name);
+    const size = markerSize(place.stat.visitCount);
+    const marker = window.L.marker([place.lat, place.lng], {
+      title: place.name,
+      icon: window.L.divIcon({
+        className: "tourism-marker-wrap",
+        iconSize: [size, size],
+        iconAnchor: [size / 2, size / 2],
+        html: `<span class="tourism-marker crowd-${place.stat.crowdLevel} ${action ? `priority-${action.priority}` : ""} ${place.id === state.selectedDestination ? "selected" : ""}" style="--marker-size:${size}px"></span>`
+      })
+    }).addTo(map);
+    marker.bindPopup(mapPopup(place, action), { maxWidth: 300, minWidth: 230 });
+    marker.on("click", () => onSelectDestination(place.id));
+    markers.set(place.id, marker);
+  });
+
+  if (state.region === "All Regions" || data.placesWithStats.length > 1) {
+    map.fitBounds(bounds.pad(0.12), { maxZoom: state.region === "All Regions" ? 8 : 13 });
+  } else {
+    map.setView([data.selected.lat, data.selected.lng], 13);
+  }
+
+  const selectedMarker = markers.get(data.selected.id);
+  if (selectedMarker) {
+    selectedMarker.openPopup();
+  }
+  activeMaps.push(map);
 }
 
 function renderLineChart(title, series, unit) {
