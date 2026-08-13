@@ -1,0 +1,10 @@
+{
+  "name": "tripsafe-tourism-dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "python -m http.server 5173",
+    "check": "node --check src/app.js && node --check src/ui.js && node --check src/data/repository.js && node --check src/data/demoData.js && node --check src/services/intelligenceService.js && node --check src/services/privacyService.js"
+  }
+}
