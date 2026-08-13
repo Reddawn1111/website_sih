@@ -11,6 +11,16 @@ export function joinPlacesWithStats(places, stats) {
 
 export function kpis(placesWithStats, riskSignals) {
   const visible = placesWithStats.filter((place) => canDisplayAggregate(place.stat));
+  if (!visible.length) {
+    return [
+      { label: "Active consenting travellers", value: "0", delta: "No matching aggregates" },
+      { label: "Total visits", value: "0", delta: "Adjust filters" },
+      { label: "Most visited destination", value: "None", delta: "No matching aggregates" },
+      { label: "Average dwell time", value: "0 min", delta: "No matching aggregates" },
+      { label: "Crowd pressure", value: "N/A", delta: "No matching aggregates" },
+      { label: "Safety/risk alerts", value: riskSignals.length, delta: "Advisory demo insights", tone: "high" }
+    ];
+  }
   const totalVisits = visible.reduce((sum, place) => sum + place.stat.visitCount, 0);
   const travellers = visible.reduce((sum, place) => sum + place.stat.contributorCount, 0);
   const top = [...visible].sort((a, b) => b.stat.visitCount - a.stat.visitCount)[0];
@@ -27,18 +37,22 @@ export function kpis(placesWithStats, riskSignals) {
 }
 
 export function keyInsights(placesWithStats, risks, mobility) {
+  if (!placesWithStats.length) {
+    return ["No matching aggregated demo data for the current filters."];
+  }
   const fastGrowing = [...placesWithStats].sort((a, b) => b.stat.trendPercent - a.stat.trendPercent)[0];
   const hiddenGem = tourismOpportunities(placesWithStats)[0];
-  const critical = placesWithStats.find((place) => place.stat.crowdLevel === "critical");
+  const critical = placesWithStats.find((place) => place.stat.crowdLevel === "critical") || placesWithStats[0];
   const corridor = [...mobility].sort((a, b) => b.pressurePercent - a.pressurePercent)[0];
   const risk = risks.find((item) => item.level === "high");
-  return [
+  const insights = [
     `${critical.name} is experiencing critical crowd pressure during ${critical.stat.peakHour}.`,
     `${fastGrowing.name} visits increased ${fastGrowing.stat.trendPercent}% this week.`,
-    `${hiddenGem.name} has high ratings but low visitation: strong promotion opportunity.`,
-    `${corridor.corridorName} shows recurring ${corridor.peakWindow} mobility pressure.`,
-    `${placesWithStats.find((place) => place.id === risk.placeId).name} has elevated advisory risk: ${risk.reason}.`
+    `${hiddenGem.name} has high ratings but low visitation: strong promotion opportunity.`
   ];
+  if (corridor) insights.push(`${corridor.corridorName} shows recurring ${corridor.peakWindow} mobility pressure.`);
+  if (risk) insights.push(`${placesWithStats.find((place) => place.id === risk.placeId)?.name || risk.placeId} has elevated advisory risk: ${risk.reason}.`);
+  return insights;
 }
 
 export function destinationRecommendation(place) {

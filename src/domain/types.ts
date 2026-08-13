@@ -87,6 +87,28 @@ export interface TourismRecommendation {
   objective: string;
 }
 
+export interface TourismAction {
+  id: string;
+  title: string;
+  location: string;
+  category: "Crowd Management" | "Tourism Promotion" | "Infrastructure" | "Facility Improvement" | "Safety & Risk";
+  priority: "urgent" | "high" | "opportunity" | "monitor";
+  priorityScore: number;
+  evidence: string[];
+  recommendedAction: string;
+  expectedImpact: string;
+  dataConfidence: "Low" | "Medium" | "High";
+  fieldValidationStatus: "Requires field validation" | "Validated" | "Not applicable";
+  scoreExplanation: string;
+}
+
+export interface DestinationHealthScore {
+  score: number;
+  good: string[];
+  warning: string[];
+  opportunity: string[];
+}
+
 export interface DataRepository {
   getPlaces(): Promise<Place[]>;
   getAggregatedPlaceStats(): Promise<AggregatedPlaceStats[]>;

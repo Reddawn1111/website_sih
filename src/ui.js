@@ -6,11 +6,13 @@ import {
   kpis,
   tourismOpportunities
 } from "./services/intelligenceService.js";
+import { buildActionCenter, destinationHealth, groupedActions, simulateImpact } from "./services/actionEngine.js";
 import { DATA_SOURCE, MIN_AGGREGATION_THRESHOLD } from "./data/demoData.js";
 import { displayValue, privacySummary } from "./services/privacyService.js";
 
 const routeLabels = {
   dashboard: "Dashboard",
+  actionCenter: "Action Center",
   tourism: "Tourism Intelligence",
   crowd: "Crowd Management",
   opportunities: "Tourism Opportunities",
@@ -101,6 +103,9 @@ function filteredData(state, data) {
 
 function renderRoute(state, rawData) {
   const data = filteredData(state, rawData);
+  if (!data.placesWithStats.length) {
+    return renderEmptyState();
+  }
   const routes = {
     dashboard: renderDashboard,
     tourism: renderTourism,
@@ -110,13 +115,26 @@ function renderRoute(state, rawData) {
     safety: renderSafety,
     recommendations: renderRecommendations,
     destinations: renderDestinations,
+    actionCenter: renderActionCenter,
     privacy: renderPrivacy
   };
   return routes[state.route](state, data);
 }
 
+function renderEmptyState() {
+  return `
+    <section class="grid">
+      <section class="card pad span-12">
+        <h2>Insufficient aggregated data</h2>
+        <p>No destination-level aggregate meets the current filter combination. Adjust region, category or crowd filters to view demo insights.</p>
+      </section>
+    </section>
+  `;
+}
+
 function renderDashboard(state, data) {
   const insightItems = keyInsights(data.placesWithStats, data.risks, data.mobility).map((text) => `<div class="insight">${text}</div>`).join("");
+  const actions = buildActionCenter(data.placesWithStats, data.risks, data.mobility);
   return `
     <section class="grid">
       ${kpis(data.placesWithStats, data.risks).map(renderKpi).join("")}
@@ -127,11 +145,28 @@ function renderDashboard(state, data) {
       <section class="card span-7">${renderMap(state, data)}</section>
       <section class="card pad span-6">${renderLineChart("Visits over time", data.visitsOverTime, "Visits")}</section>
       <section class="card pad span-6">${renderHourlyCurve(data.hourlyCurve)}</section>
+      <section class="card pad span-12">${renderActionSummary(actions)}</section>
+      <section class="card pad span-12">${renderImpactSimulator(state, data)}</section>
       <section class="card pad span-12 secondary-only">
         <h2>Recommended Authority Actions</h2>
-        <div class="recommendation-list">${data.recommendations.slice(0, 4).map(renderRecommendation).join("")}</div>
+        <div class="recommendation-list">${actions.slice(0, 4).map(renderActionCard).join("")}</div>
       </section>
     </section>
+  `;
+}
+
+function renderActionSummary(actions) {
+  return `
+    <h2>Action Center Snapshot</h2>
+    <p>Tourism Data -> Decision Support. Each item follows Observation -> Evidence -> Problem/Opportunity -> Recommended Action -> Priority -> Expected Impact.</p>
+    <div class="action-summary">
+      ${groupedActions(actions).map((group) => `
+        <div class="action-count priority-${group.priority}">
+          <span>${group.label}</span>
+          <strong>${group.actions.length}</strong>
+        </div>
+      `).join("")}
+    </div>
   `;
 }
 
@@ -164,6 +199,7 @@ function renderTourism(state, data) {
 
 function renderCrowd(state, data) {
   const hot = [...data.placesWithStats].sort((a, b) => b.stat.visitCount / b.capacity - a.stat.visitCount / a.capacity);
+  const actions = buildActionCenter(data.placesWithStats, data.risks, data.mobility).filter((item) => item.category === "Crowd Management");
   return `
     <section class="grid">
       <section class="card span-7">${renderMap(state, data)}</section>
@@ -181,7 +217,7 @@ function renderCrowd(state, data) {
       </section>
       <section class="card pad span-12">
         <h2>Actionable Crowd Recommendations</h2>
-        <div class="recommendation-list">${data.recommendations.filter((item) => item.problem.toLowerCase().includes("crowd") || item.problem.toLowerCase().includes("pressure")).map(renderRecommendation).join("")}</div>
+        <div class="recommendation-list">${actions.map(renderActionCard).join("")}</div>
       </section>
     </section>
   `;
@@ -201,7 +237,7 @@ function renderOpportunities(state, data) {
               <span>${place.stat.averageDwellMinutes} min dwell</span>
               <span class="status-${place.stat.crowdLevel}">${place.stat.crowdLevel}</span>
               <span>${place.opportunityScore}/100 score</span>
-              <span>${place.stat.visitCount < 3000 ? "Hidden gem opportunity" : "Balanced promotion candidate"}</span>
+              <span>${promotionText(place, data.placesWithStats)}</span>
             </div>
           `).join("")}
         </div>
@@ -211,10 +247,13 @@ function renderOpportunities(state, data) {
 }
 
 function renderMobility(state, data) {
+  const infraActions = buildActionCenter(data.placesWithStats, data.risks, data.mobility)
+    .filter((item) => item.category === "Infrastructure" || item.category === "Facility Improvement");
   return `
     <section class="grid">
       <section class="card pad span-12">
         <h2>Tourism Mobility Hotspots</h2>
+        <p>Data-driven recommendation - field validation required. These are potential infrastructure priorities, not confirmed engineering conclusions.</p>
         <div class="recommendation-list">
           ${data.mobility.map((item) => `
             <div class="recommendation">
@@ -227,11 +266,16 @@ function renderMobility(state, data) {
           `).join("")}
         </div>
       </section>
+      <section class="card pad span-12">
+        <h2>Road, Pedestrian, Parking & Facility Actions</h2>
+        <div class="recommendation-list">${infraActions.map(renderActionCard).join("")}</div>
+      </section>
     </section>
   `;
 }
 
 function renderSafety(state, data) {
+  const safetyActions = buildActionCenter(data.placesWithStats, data.risks, data.mobility).filter((item) => item.category === "Safety & Risk");
   return `
     <section class="grid">
       <section class="card pad span-12">
@@ -252,17 +296,26 @@ function renderSafety(state, data) {
           }).join("")}
         </div>
       </section>
+      <section class="card pad span-12">
+        <h2>Safety & Risk Actions</h2>
+        <div class="recommendation-list">${safetyActions.map(renderActionCard).join("")}</div>
+      </section>
     </section>
   `;
 }
 
 function renderRecommendations(state, data) {
+  const actions = buildActionCenter(data.placesWithStats, data.risks, data.mobility);
   return `
     <section class="grid">
       <section class="card pad span-12">
         <h2>Transparent Recommendation Engine</h2>
         <p>Rules combine crowd pressure, visit trend, dwell time, destination popularity, risk level, alternatives and mobility pressure.</p>
         <div class="recommendation-list">${data.recommendations.map(renderRecommendation).join("")}</div>
+      </section>
+      <section class="card pad span-12">
+        <h2>Explainable Priority Ranking</h2>
+        <div class="recommendation-list">${actions.map(renderActionCard).join("")}</div>
       </section>
     </section>
   `;
@@ -277,6 +330,26 @@ function renderDestinations(state, data) {
         <div class="destination-list">${data.placesWithStats.map(renderDestinationRow).join("")}</div>
       </section>
       <section class="card pad span-7">${renderDestinationDetail(selected, data)}</section>
+    </section>
+  `;
+}
+
+function renderActionCenter(state, data) {
+  const actions = buildActionCenter(data.placesWithStats, data.risks, data.mobility);
+  return `
+    <section class="grid">
+      <section class="card pad span-12">
+        <h2>Action Center</h2>
+        <p>Actionable tourism and infrastructure intelligence. Every recommendation is demo-only and requires field validation before implementation.</p>
+        ${renderActionSummary(actions)}
+      </section>
+      <section class="card pad span-12">${renderImpactSimulator(state, data)}</section>
+      ${groupedActions(actions).map((group) => `
+        <section class="card pad span-12">
+          <h2>${group.label}</h2>
+          <div class="recommendation-list">${group.actions.length ? group.actions.map(renderActionCard).join("") : "<p>No matching recommendations in the current filters.</p>"}</div>
+        </section>
+      `).join("")}
     </section>
   `;
 }
@@ -308,6 +381,31 @@ function renderRecommendation(item) {
   `;
 }
 
+function renderActionCard(item) {
+  return `
+    <article class="action-card priority-${item.priority}">
+      <div>
+        <span class="status-pill">${item.priority.toUpperCase()}</span>
+        <span class="score-pill">Priority Score: ${item.priorityScore}/100</span>
+      </div>
+      <div>
+        <h3>${item.title}</h3>
+        <div class="chips">
+          <span class="chip">Location: ${item.location}</span>
+          <span class="chip">Category: ${item.category}</span>
+          <span class="chip">Confidence: ${item.dataConfidence}</span>
+          <span class="chip">Status: ${item.fieldValidationStatus}</span>
+        </div>
+        <p><strong>Evidence:</strong></p>
+        <ul>${item.evidence.map((point) => `<li>${point}</li>`).join("")}</ul>
+        <p><strong>Recommended action:</strong> ${item.recommendedAction}</p>
+        <p><strong>Expected impact:</strong> ${item.expectedImpact}</p>
+        <p><strong>Score explanation:</strong> ${item.scoreExplanation}</p>
+      </div>
+    </article>
+  `;
+}
+
 function renderDestinationRow(place) {
   return `
     <div class="destination-row" data-destination="${place.id}">
@@ -326,6 +424,7 @@ function renderDestinationDetail(place, data) {
   const alternatives = place.alternatives.map((id) => data.placesWithStats.find((item) => item.id === id)?.name).filter(Boolean).join(", ");
   const risk = data.risks.find((item) => item.placeId === place.id);
   const mobility = data.mobility.find((item) => item.connectedPlaceIds.includes(place.id));
+  const health = destinationHealth(place, data.risks, data.mobility);
   return `
     <h2>${place.name}</h2>
     <div class="detail-layout">
@@ -336,6 +435,16 @@ function renderDestinationDetail(place, data) {
           <span class="chip">Crowd ${place.stat.crowdLevel}</span>
           <span class="chip">Trend ${place.stat.trendPercent > 0 ? "+" : ""}${place.stat.trendPercent}%</span>
         </div>
+        <div class="health-panel">
+          <div class="kpi-value">${health.score}/100</div>
+          <strong>Destination Health</strong>
+          <p>Transparent score from visitation, trend, dwell time, rating, crowd pressure, risk and infrastructure signals.</p>
+          <div class="health-grid">
+            <div><span class="label">Good</span>${health.good.map((item) => `<p>${item}</p>`).join("")}</div>
+            <div><span class="label">Warning</span>${health.warning.map((item) => `<p>${item}</p>`).join("")}</div>
+            <div><span class="label">Opportunity</span>${health.opportunity.map((item) => `<p>${item}</p>`).join("")}</div>
+          </div>
+        </div>
         ${renderHourlyCurve(data.hourlyCurve)}
       </div>
       <div class="recommendation-list">
@@ -345,6 +454,59 @@ function renderDestinationDetail(place, data) {
         <div class="insight"><strong>Safety</strong><span>${risk ? risk.suggestedResponse : "No elevated advisory risk in demo data."}</span></div>
         <div class="insight"><strong>Nearby alternatives</strong><span>${alternatives || "No alternatives configured."}</span></div>
       </div>
+    </div>
+  `;
+}
+
+function promotionText(place, placesWithStats) {
+  const alternatives = place.alternatives
+    .map((id) => placesWithStats.find((candidate) => candidate.id === id))
+    .filter(Boolean);
+  const pressured = alternatives.find((candidate) => candidate.stat.crowdLevel === "high" || candidate.stat.crowdLevel === "critical");
+  if (place.stat.visitCount < 3000 && place.rating >= 4.6) {
+    return pressured
+      ? `Promote during ${place.stat.peakHour} to distribute demand away from ${pressured.name}.`
+      : `Promote during ${place.stat.peakHour}; improve wayfinding and signage.`;
+  }
+  return "Balanced promotion candidate; tune messaging by peak period.";
+}
+
+function renderImpactSimulator(state, data) {
+  const result = simulateImpact(state.scenario, data.placesWithStats);
+  return `
+    <h2>What If We Act?</h2>
+    <p><strong>SIMULATED DEMO OUTCOME.</strong> This is a lightweight scenario model, not a real prediction.</p>
+    <div class="simulator">
+      <label class="control">Intervention
+        <select data-filter="scenario">
+          ${[
+            ["promote", "Promote alternative destination"],
+            ["parking", "Increase parking"],
+            ["shuttle", "Add shuttle"],
+            ["signage", "Improve signage"],
+            ["redirect", "Redirect visitors"],
+            ["pedestrian", "Improve pedestrian infrastructure"]
+          ].map(([value, label]) => `<option value="${value}" ${state.scenario === value ? "selected" : ""}>${label}</option>`).join("")}
+        </select>
+      </label>
+      <div class="sim-result">
+        <div>
+          <span class="label">Current</span>
+          <strong>${result.primaryName}</strong>
+          <div class="kpi-value">${result.currentPrimary.toLocaleString("en-IN")}</div>
+        </div>
+        <div>
+          <span class="label">Projected</span>
+          <strong>${result.primaryName}</strong>
+          <div class="kpi-value">${result.projectedPrimary.toLocaleString("en-IN")}</div>
+        </div>
+        <div>
+          <span class="label">Alternative gain</span>
+          <strong>${result.alternativeName}</strong>
+          <div class="kpi-value">+${result.shiftedVisits.toLocaleString("en-IN")}</div>
+        </div>
+      </div>
+      <p>Scenario: ${result.scenarioLabel}. Expected demo benefit: ${result.impactType}.</p>
     </div>
   `;
 }

@@ -91,6 +91,32 @@ This prototype uses synthetic demo records only. Future Firebase, Supabase or AP
 - `action`
 - `objective`
 
+### TourismAction
+
+- `id`
+- `title`
+- `location`
+- `category`
+- `priority`
+- `priorityScore`
+- `evidence`
+- `recommendedAction`
+- `expectedImpact`
+- `dataConfidence`
+- `fieldValidationStatus`
+- `scoreExplanation`
+
+These records can be generated client-side for the prototype or server-side later. They must remain explainable and should not be opaque AI output.
+
+### DestinationHealthScore
+
+- `score`
+- `good`
+- `warning`
+- `opportunity`
+
+The score should be transparent and derived from visitation, trend, dwell time, rating, crowd pressure, accessibility, risk and infrastructure signals.
+
 ## Aggregation Expectations
 
 Mobile events should be uploaded as consented coarse signals or visit events. Server-side aggregation should perform visit detection, POI matching, dwell-time estimation, privacy filtering and threshold enforcement before authority dashboards read the data.

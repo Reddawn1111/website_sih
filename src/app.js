@@ -8,6 +8,7 @@ const state = {
   category: "All Categories",
   crowd: "All Crowd Levels",
   selectedDestination: "central-heritage",
+  scenario: "promote",
   presentation: false
 };
 
