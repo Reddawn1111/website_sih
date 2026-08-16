@@ -1,4 +1,4 @@
-# TripSafe Future Data Contract
+# MyPravasa Future Data Contract
 
 This prototype uses synthetic demo records only. Future Firebase, Supabase or API ingestion should preserve the same domain shape so the dashboard UI and business logic do not need to be rewritten.
 
@@ -124,7 +124,7 @@ Mobile events should be uploaded as consented coarse signals or visit events. Se
 Pipeline:
 
 ```text
-TripSafe mobile users
+MyPravasa mobile users
 -> consented location/activity signals
 -> visit detection
 -> POI matching

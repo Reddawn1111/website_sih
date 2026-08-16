@@ -73,6 +73,6 @@ export function whyThisMatters(place, mobilityInsights) {
   if (!movement) {
     return `${place.stat.visitCount.toLocaleString("en-IN")} aggregated visits peak during ${place.stat.peakHour}; continue monitoring visitor demand and dwell time.`;
   }
-  const delay = movement.delayPercent === null ? "" : ` Travel delay is ${movement.delayPercent > 0 ? "+" : ""}${movement.delayPercent}% relative to the demo baseline.`;
+  const delay = movement.delayPercent === null ? "" : ` Travel delay is ${movement.delayPercent > 0 ? "+" : ""}${movement.delayPercent}% against baseline.`;
   return `${place.stat.visitCount.toLocaleString("en-IN")} aggregated visits peak during ${place.stat.peakHour} with ${place.stat.averageDwellMinutes} minutes average dwell. Movement concentrates on ${movement.corridorName} in the same window, indicating a potential crowd and mobility pressure period.${delay}`;
 }

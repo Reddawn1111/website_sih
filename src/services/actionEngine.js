@@ -39,11 +39,11 @@ function mobilityScore(mobility) {
 function mobilityEvidence(mobility) {
   if (!mobility) return [];
   const evidence = [
-    `${mobility.tripCount.toLocaleString("en-IN")} aggregated demo trips`,
+    `${mobility.tripCount.toLocaleString("en-IN")} aggregated trips`,
     `Observed: ${mobility.averageTravelMinutes} min average travel during ${mobility.peakWindow}`
   ];
   if (mobility.delayPercent !== null && mobility.delayPercent !== undefined) {
-    evidence.push(`Calculated: ${mobility.delayPercent > 0 ? "+" : ""}${mobility.delayPercent}% travel delay relative to demo baseline`);
+    evidence.push(`Calculated: ${mobility.delayPercent > 0 ? "+" : ""}${mobility.delayPercent}% travel delay against baseline`);
   }
   evidence.push(`Inferred: ${mobility.inferredSignals?.[0] || "Potential corridor pressure"}`);
   return evidence;
@@ -102,11 +102,11 @@ export function buildActionCenter(placesWithStats, risks, mobility) {
         id: `crowd-${place.id}`,
         title: `Review peak-hour crowd management at ${place.name}`,
         location: place.name,
-        category: "Crowd Management",
+        category: "Crowd management",
         priority: priorityFromScore(score),
         priorityScore: score,
         evidence: [
-          `${place.stat.visitCount.toLocaleString("en-IN")} aggregated demo visits`,
+          `${place.stat.visitCount.toLocaleString("en-IN")} aggregated visits`,
           `Peak concentration: ${place.stat.peakHour}`,
           `Crowd level: ${place.stat.crowdLevel}`,
           `Visit trend: ${place.stat.trendPercent > 0 ? "+" : ""}${place.stat.trendPercent}%`,
@@ -128,12 +128,12 @@ export function buildActionCenter(placesWithStats, risks, mobility) {
           id: `redistribute-${place.id}`,
           title: `Redistribute visitors from ${place.name} to ${underusedAlt.name}`,
           location: place.name,
-          category: "Visitor Redistribution",
+          category: "Visitor redistribution",
           priority: priorityFromScore(redistributeScore),
           priorityScore: redistributeScore,
           evidence: [
             `Observed: ${place.stat.crowdLevel} crowd at ${place.name} during ${place.stat.peakHour}`,
-            `${place.stat.visitCount.toLocaleString("en-IN")} aggregated demo visits`,
+            `${place.stat.visitCount.toLocaleString("en-IN")} aggregated visits`,
             `Nearby lower-pressure option: ${underusedAlt.name} (${underusedAlt.stat.visitCount.toLocaleString("en-IN")} visits, ${underusedAlt.stat.crowdLevel} crowd)`,
             `Inferred: Potential visitor concentration imbalance`
           ],
@@ -153,7 +153,7 @@ export function buildActionCenter(placesWithStats, risks, mobility) {
         id: `promo-${place.id}`,
         title: `Promote ${place.name} as a hidden-gem alternative`,
         location: place.name,
-        category: "Tourism Promotion",
+        category: "Tourism promotion",
         priority: priorityFromScore(score),
         priorityScore: score,
         evidence: [
@@ -176,14 +176,14 @@ export function buildActionCenter(placesWithStats, risks, mobility) {
         id: `infra-${place.id}`,
         title: `Evaluate potential road and access pressure near ${place.name}`,
         location: place.name,
-        category: "Road/Traffic Pressure",
+        category: "Road & traffic pressure",
         priority: priorityFromScore(score),
         priorityScore: score,
         evidence: [
           ...mobilityEvidence(move),
           `Corridor concentration: ${move.corridorConcentrationPercent}%`,
           `Destination crowd level: ${place.stat.crowdLevel}`,
-          `${place.stat.visitCount.toLocaleString("en-IN")} aggregated demo visits`
+          `${place.stat.visitCount.toLocaleString("en-IN")} aggregated visits`
         ],
         recommendedAction: "Evaluate alternate routing, traffic signal timing, pedestrian crossings, parking guidance and additional public-transport or shuttle capacity. Field validation is required before capacity decisions.",
         expectedImpact: "Potentially reduce peak travel delay and improve visitor access.",
@@ -199,11 +199,11 @@ export function buildActionCenter(placesWithStats, risks, mobility) {
         id: `transit-${place.id}`,
         title: `Review potential transit pressure serving ${place.name}`,
         location: place.name,
-        category: "Public Transit Pressure",
+        category: "Public transit pressure",
         priority: priorityFromScore(score),
         priorityScore: score,
         evidence: [
-          `${move.tripCount.toLocaleString("en-IN")} aggregated demo trips on ${move.corridorName}`,
+          `${move.tripCount.toLocaleString("en-IN")} aggregated trips on ${move.corridorName}`,
           `Observed: ${move.transitConcentrationPercent}% transit-area concentration during ${move.peakWindow}`,
           `Calculated: ${move.averageStopDwellMinutes} min average dwell at the transition zone`,
           "Inferred: Potential transit pressure"
@@ -222,14 +222,14 @@ export function buildActionCenter(placesWithStats, risks, mobility) {
         id: `facility-${place.id}`,
         title: `Review visitor facilities at ${place.name}`,
         location: place.name,
-        category: "Facility Improvement",
+        category: "Facility improvement",
         priority: priorityFromScore(score),
         priorityScore: score,
         evidence: [
-          `${place.stat.visitCount.toLocaleString("en-IN")} aggregated demo visits`,
+          `${place.stat.visitCount.toLocaleString("en-IN")} aggregated visits`,
           `Average dwell: ${place.stat.averageDwellMinutes} minutes`,
           `Crowd level: ${place.stat.crowdLevel}`,
-          ...(move?.privateVehiclePercent >= 55 ? [`Observed: ${move.privateVehiclePercent}% private-vehicle share on the connected demo corridor`] : [])
+          ...(move?.privateVehiclePercent >= 55 ? [`Observed: ${move.privateVehiclePercent}% private-vehicle share on the connected corridor`] : [])
         ],
         recommendedAction: `Facility capacity review recommended: evaluate toilets, drinking water, shade, seating, accessibility, waste-management and visitor amenities.${move?.privateVehiclePercent >= 55 ? " Also review parking or park-and-ride access." : ""}`,
         expectedImpact: "Improve visitor comfort and reduce operational stress at popular destinations.",
@@ -245,12 +245,12 @@ export function buildActionCenter(placesWithStats, risks, mobility) {
         id: `parking-${place.id}`,
         title: `Review parking and visitor access at ${place.name}`,
         location: place.name,
-        category: "Parking & Access",
+        category: "Parking & access",
         priority: priorityFromScore(score),
         priorityScore: score,
         evidence: [
           `Observed: ${move.privateVehiclePercent}% private-vehicle share on ${move.corridorName}`,
-          `${place.stat.visitCount.toLocaleString("en-IN")} aggregated demo visits`,
+          `${place.stat.visitCount.toLocaleString("en-IN")} aggregated visits`,
           `Calculated road pressure: ${move.roadPressurePercent || move.pressurePercent}% during ${move.peakWindow}`,
           "Inferred: Potential parking and access pressure"
         ],
@@ -268,7 +268,7 @@ export function buildActionCenter(placesWithStats, risks, mobility) {
         id: `risk-${place.id}`,
         title: `Coordinate tourism safety advisory for ${place.name}`,
         location: place.name,
-        category: "Safety & Risk",
+        category: "Safety & risk",
         priority: priorityFromScore(score),
         priorityScore: score,
         evidence: [

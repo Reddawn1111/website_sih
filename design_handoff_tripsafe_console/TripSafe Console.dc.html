@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+body{margin:0;background:#0c0e0d}
+a{color:inherit;text-decoration:none}
+a:hover{opacity:.75}
+select,button{font:inherit;color:inherit}
+::selection{background:rgba(185,207,174,.3)}
+.tsx{scrollbar-width:thin}
+.leaflet-container{background:transparent!important;font-family:inherit}
+.leaflet-control-attribution{display:none}
+.leaflet-bar a{background:#141816;color:#e8ece9;border-color:rgba(255,255,255,.12)}
+</style>
+</helmet>
+<div style="min-height:100vh;background:var(--bg);color:var(--text);font-family:var(--fbody);font-size:13px;letter-spacing:-0.005em;{{ themeVars }}">
+
+  <header style="position:sticky;top:0;z-index:20;background:var(--bg);border-bottom:1px solid var(--line)">
+    <div style="display:flex;align-items:center;gap:20px;padding:14px 30px;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:11px">
+        <div style="width:26px;height:26px;border-radius:8px;border:1px solid var(--brand);display:flex;align-items:center;justify-content:center">
+          <div style="width:10px;height:10px;border-radius:50%;background:var(--brand)"></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:1px">
+          <span style="font-family:var(--fdisp);font-weight:600;font-size:14px;letter-spacing:-0.01em">TripSafe</span>
+          <span style="font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)">Tourism Intelligence</span>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:10px;margin-left:6px">
+        <select value="{{ region }}" onChange="{{ onRegion }}" style="background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:7px 13px;font-size:12px;cursor:pointer">
+          <sc-for list="{{ regionOptions }}" as="opt" hint-placeholder-count="4"><option value="{{ opt }}">{{ opt }}</option></sc-for>
+        </select>
+        <select value="{{ category }}" onChange="{{ onCategory }}" style="background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:7px 13px;font-size:12px;cursor:pointer">
+          <sc-for list="{{ categoryOptions }}" as="opt" hint-placeholder-count="4"><option value="{{ opt }}">{{ opt }}</option></sc-for>
+        </select>
+        <select value="{{ dateRange }}" onChange="{{ onDateRange }}" style="background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:7px 13px;font-size:12px;cursor:pointer">
+          <sc-for list="{{ dateOptions }}" as="opt" hint-placeholder-count="3"><option value="{{ opt }}">{{ opt }}</option></sc-for>
+        </select>
+      </div>
+
+      <div style="flex:1"></div>
+
+      <div style="display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--muted);white-space:nowrap;flex:none">
+        <span style="width:6px;height:6px;border-radius:50%;background:var(--mod);box-shadow:0 0 0 3px rgba(169,192,150,.15)"></span>
+        <span>Live feed · {{ feedAge }}</span>
+      </div>
+      <span style="font-family:var(--fnum);font-size:14px;letter-spacing:0.01em;white-space:nowrap;flex:none">{{ clock }}</span>
+      <div style="display:flex;align-items:center;gap:2px;padding:3px;border:1px solid var(--line);border-radius:999px">
+        <button onClick="{{ setConsole }}" style="border:0;background:{{ themeAbg }};color:{{ themeAfg }};border-radius:999px;padding:5px 11px;font-size:11px;cursor:pointer">Console</button>
+        <button onClick="{{ setField }}" style="border:0;background:{{ themeBbg }};color:{{ themeBfg }};border-radius:999px;padding:5px 11px;font-size:11px;cursor:pointer">Field</button>
+      </div>
+      <button onClick="{{ togglePresentation }}" style="background:transparent;border:1px solid var(--line);border-radius:999px;padding:6px 13px;font-size:11.5px;cursor:pointer">{{ presentationLabel }}</button>
+      <div style="display:flex;align-items:center;gap:9px;padding-left:16px;border-left:1px solid var(--line)">
+        <div style="width:26px;height:26px;border-radius:50%;background:var(--panel2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:10.5px;font-family:var(--fnum)">KR</div>
+        <div style="display:flex;flex-direction:column;line-height:1.25">
+          <span style="font-size:12px">K. Ramesh</span>
+          <span style="font-size:10px;color:var(--muted)">Tourism Authority</span>
+        </div>
+      </div>
+    </div>
+
+    <nav style="display:flex;align-items:stretch;gap:2px;padding:0 30px;overflow-x:auto">
+      <sc-for list="{{ tabs }}" as="tab" hint-placeholder-count="10">
+        <button onClick="{{ tab.go }}" style="background:transparent;border:0;border-bottom:2px solid {{ tab.bar }};color:{{ tab.color }};padding:11px 14px 12px;font-size:12.5px;white-space:nowrap;cursor:pointer;font-weight:{{ tab.weight }}">{{ tab.label }}</button>
+      </sc-for>
+    </nav>
+  </header>
+
+  <main style="padding:26px 30px 60px;display:flex;flex-direction:column;gap:18px">
+
+    <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:24px;padding-bottom:2px">
+      <div style="display:flex;flex-direction:column;gap:7px">
+        <h1 style="margin:0;font-family:var(--fdisp);font-weight:600;font-size:var(--h1);letter-spacing:-0.025em;line-height:1">{{ routeTitle }}</h1>
+        <p style="margin:0;color:var(--muted);font-size:12.5px;max-width:70ch;line-height:1.5">{{ routeBlurb }}</p>
+      </div>
+      <div style="display:flex;gap:9px;flex-wrap:wrap;justify-content:flex-end">
+        <sc-for list="{{ contextChips }}" as="chip" hint-placeholder-count="3">
+          <span style="border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:11px;color:var(--muted);white-space:nowrap">{{ chip }}</span>
+        </sc-for>
+      </div>
+    </div>
+
+    <sc-if value="{{ showKpis }}" hint-placeholder-val="{{ true }}">
+      <section style="display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px">
+        <sc-for list="{{ kpiList }}" as="k" hint-placeholder-count="6">
+          <article style="border:1px solid {{ k.border }};border-radius:var(--r);background:{{ k.bg }};color:{{ k.fg }};padding:16px 16px 15px;display:flex;flex-direction:column;gap:10px;min-height:118px">
+            <span style="font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;opacity:.62">{{ k.label }}</span>
+            <div style="flex:1;display:flex;align-items:flex-end">
+              <span style="font-family:var(--fnum);font-size:{{ k.size }};line-height:1.05;letter-spacing:-0.03em;color:{{ k.tone }};min-width:0;overflow-wrap:anywhere">{{ k.value }}</span>
+            </div>
+            <span style="font-size:11px;opacity:.55;line-height:1.35">{{ k.delta }}</span>
+          </article>
+        </sc-for>
+      </section>
+    </sc-if>
+
+    <sc-if value="{{ showMap }}" hint-placeholder-val="{{ true }}">
+      <section style="display:grid;grid-template-columns:{{ mapGrid }};gap:12px">
+        <div style="border:1px solid var(--line);border-radius:var(--r);background:var(--panel);overflow:hidden;display:flex;flex-direction:column">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:15px 18px;border-bottom:1px solid var(--line)">
+            <div style="display:flex;flex-direction:column;gap:3px">
+              <span style="font-family:var(--fdisp);font-size:14px;font-weight:600">Live destination pressure</span>
+              <span style="font-size:11px;color:var(--muted)">Circle area scales with aggregated visits · colour shows crowd level</span>
+            </div>
+            <div style="display:flex;gap:14px;font-size:10.5px;color:var(--muted)">
+              <sc-for list="{{ crowdLegend }}" as="l" hint-placeholder-count="4">
+                <span style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:{{ l.color }}"></span>{{ l.label }}</span>
+              </sc-for>
+            </div>
+          </div>
+          <div data-map="1" style="height:var(--maph);width:100%"></div>
+        </div>
+        <sc-if value="{{ showMapSide }}" hint-placeholder-val="{{ true }}">
+          <div style="border:1px solid var(--line);border-radius:var(--r);background:var(--panel);padding:16px 18px;display:flex;flex-direction:column;gap:12px">
+            <span style="font-family:var(--fdisp);font-size:14px;font-weight:600">{{ sideTitle }}</span>
+            <div style="display:flex;flex-direction:column;gap:1px">
+              <sc-for list="{{ sideList }}" as="s" hint-placeholder-count="5">
+                <div style="padding:12px 0;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:5px">
+                  <span style="font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:{{ s.tagColor }}">{{ s.tag }}</span>
+                  <span style="font-size:12.5px;line-height:1.45;color:var(--text)">{{ s.text }}</span>
+                  <span style="font-size:11px;color:var(--muted);line-height:1.4">{{ s.sub }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+      </section>
+    </sc-if>
+
+    <sc-if value="{{ showMobilityStrip }}" hint-placeholder-val="{{ true }}">
+      <section style="border:1px solid var(--line);border-radius:var(--r);background:var(--panel);padding:16px 18px;display:flex;flex-direction:column;gap:14px">
+        <div style="display:flex;align-items:baseline;justify-content:space-between">
+          <span style="font-family:var(--fdisp);font-size:14px;font-weight:600">Mobility pressure</span>
+          <span style="font-size:11px;color:var(--muted)">Observed · calculated · inferred, shown separately</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px">
+          <sc-for list="{{ mobilityStats }}" as="m" hint-placeholder-count="6">
+            <div style="display:flex;flex-direction:column;gap:7px;padding:12px 0 0;border-top:1px solid var(--line)">
+              <span style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">{{ m.label }}</span>
+              <span style="font-family:var(--fnum);font-size:{{ m.size }};letter-spacing:-0.02em;line-height:1.15;color:{{ m.tone }}">{{ m.value }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </section>
+    </sc-if>
+
+    <sc-if value="{{ showCharts }}" hint-placeholder-val="{{ true }}">
+      <section style="display:grid;grid-template-columns:1.35fr 1fr;gap:12px">
+        <div style="border:1px solid var(--line);border-radius:var(--r);background:var(--panel);padding:16px 18px 14px;display:flex;flex-direction:column;gap:18px">
+          <div style="display:flex;align-items:baseline;justify-content:space-between">
+            <span style="font-family:var(--fdisp);font-size:14px;font-weight:600">Visits / week</span>
+            <span style="font-size:11px;color:var(--muted)">{{ visitsTotal }} visits · peak {{ visitsPeakDay }}</span>
+          </div>
+          <div style="display:flex;align-items:flex-end;gap:10px;height:150px">
+            <sc-for list="{{ visitBars }}" as="b" hint-placeholder-count="7">
+              <div style="flex:1;display:flex;flex-direction:column;gap:8px;align-items:stretch;height:100%;justify-content:flex-end">
+                <span style="font-family:var(--fnum);font-size:11px;color:{{ b.tone }};text-align:center">{{ b.value }}</span>
+                <div style="height:{{ b.h }}%;background:{{ b.fill }};border-radius:4px 4px 2px 2px"></div>
+                <span style="font-size:11px;color:var(--muted);text-align:center">{{ b.label }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        <div style="border:1px solid var(--line);border-radius:var(--r);background:var(--panel);padding:16px 18px 14px;display:flex;flex-direction:column;gap:18px">
+          <div style="display:flex;align-items:baseline;justify-content:space-between">
+            <span style="font-family:var(--fdisp);font-size:14px;font-weight:600">Intraday concentration</span>
+            <span style="font-size:11px;color:var(--muted)">Peak {{ hourlyPeak }}</span>
+          </div>
+          <div style="display:flex;align-items:flex-end;gap:3px;height:150px">
+            <sc-for list="{{ hourBars }}" as="h" hint-placeholder-count="24">
+              <div style="flex:1;height:{{ h.h }}%;background:{{ h.fill }};border-radius:2px"></div>
+            </sc-for>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:10.5px;color:var(--muted)">
+            <span>00</span><span>06</span><span>12</span><span>18</span><span>23</span>
+          </div>
+        </div>
+      </section>
+    </sc-if>
+
+    <sc-if value="{{ showCategories }}" hint-placeholder-val="{{ true }}">
+      <section style="border:1px solid var(--line);border-radius:var(--r);background:var(--panel);padding:16px 18px;display:flex;flex-direction:column;gap:14px">
+        <span style="font-family:var(--fdisp);font-size:14px;font-weight:600">Demand by activity category</span>
+        <div style="display:flex;flex-direction:column;gap:9px">
+          <sc-for list="{{ categoryBars }}" as="c" hint-placeholder-count="7">
+            <div style="display:grid;grid-template-columns:150px minmax(0,1fr) 80px;align-items:center;gap:14px">
+              <span style="font-size:12px">{{ c.label }}</span>
+              <div style="height:8px;background:var(--panel2);border-radius:999px;overflow:hidden">
+                <div style="width:{{ c.w }}%;height:100%;background:{{ c.fill }};border-radius:999px"></div>
+              </div>
+              <span style="font-family:var(--fnum);font-size:12px;text-align:right;color:var(--muted)">{{ c.value }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </section>
+    </sc-if>
+
+    <sc-if value="{{ showTable }}" hint-placeholder-val="{{ true }}">
+      <section style="border:1px solid var(--line);border-radius:var(--r);background:var(--panel);overflow:hidden">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;padding:16px 18px 14px">
+          <span style="font-family:var(--fdisp);font-size:14px;font-weight:600">{{ tableTitle }}</span>
+          <span style="font-size:11px;color:var(--muted)">{{ tableNote }}</span>
+        </div>
+        <div style="display:grid;grid-template-columns:minmax(0,2.2fr) 92px 92px 118px 96px 120px;gap:14px;padding:9px 18px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);font-size:10px;letter-spacing:.11em;text-transform:uppercase;color:var(--muted)">
+          <span>Destination</span><span style="text-align:right">Visits</span><span style="text-align:right">Avg dwell</span><span>Peak window</span><span>Crowd</span><span style="text-align:right">{{ tableExtraLabel }}</span>
+        </div>
+        <sc-for list="{{ tableRows }}" as="r" hint-placeholder-count="8">
+          <div onClick="{{ r.select }}" style="display:grid;grid-template-columns:minmax(0,2.2fr) 92px 92px 118px 96px 120px;gap:14px;padding:13px 18px;border-bottom:1px solid var(--line);align-items:center;cursor:pointer;background:{{ r.bg }}" style-hover="background:var(--panel2)">
+            <span style="display:flex;flex-direction:column;gap:3px;min-width:0">
+              <span style="font-size:13px">{{ r.name }}</span>
+              <span style="font-size:11px;color:var(--muted)">{{ r.sub }}</span>
+            </span>
+            <span style="font-family:var(--fnum);font-size:13px;text-align:right">{{ r.visits }}</span>
+            <span style="font-family:var(--fnum);font-size:13px;text-align:right;color:var(--muted)">{{ r.dwell }}</span>
+            <span style="font-size:12px;color:var(--muted)">{{ r.peak }}</span>
+            <span style="font-size:11px;letter-spacing:.06em;color:{{ r.crowdColor }}">{{ r.crowd }}</span>
+            <span style="font-family:var(--fnum);font-size:13px;text-align:right;color:{{ r.extraColor }}">{{ r.extra }}</span>
+          </div>
+        </sc-for>
+      </section>
+    </sc-if>
+
+    <sc-if value="{{ showDetail }}" hint-placeholder-val="{{ true }}">
+      <section style="display:grid;grid-template-columns:1fr 1.25fr;gap:12px">
+        <div style="border:1px solid var(--line);border-radius:var(--r);background:var(--hi);color:var(--onhi);padding:20px;display:flex;flex-direction:column;gap:16px">
+          <div style="display:flex;flex-direction:column;gap:5px">
+            <span style="font-size:10px;letter-spacing:.13em;text-transform:uppercase;opacity:.6">Destination health</span>
+            <span style="font-family:var(--fdisp);font-size:19px;font-weight:600;letter-spacing:-0.02em">{{ detailName }}</span>
+          </div>
+          <div style="display:flex;align-items:flex-end;gap:10px">
+            <span style="font-family:var(--fnum);font-size:64px;line-height:.85;letter-spacing:-0.04em">{{ detailScore }}</span>
+            <span style="font-size:12px;opacity:.55;padding-bottom:6px">/ 100</span>
+          </div>
+          <div style="height:6px;background:rgba(0,0,0,.14);border-radius:999px;overflow:hidden">
+            <div style="width:{{ detailScore }}%;height:100%;background:{{ detailScoreFill }};border-radius:999px"></div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <sc-for list="{{ detailFactors }}" as="f" hint-placeholder-count="3">
+              <div style="display:flex;flex-direction:column;gap:5px;padding-top:11px;border-top:1px solid rgba(0,0,0,.12)">
+                <span style="font-size:10px;letter-spacing:.13em;text-transform:uppercase;opacity:.6">{{ f.label }}</span>
+                <span style="font-size:12.5px;line-height:1.45">{{ f.text }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div style="border:1px solid var(--line);border-radius:var(--r);background:var(--panel);padding:17px 18px;display:flex;flex-direction:column;gap:9px">
+            <span style="font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted)">Why this matters</span>
+            <p style="margin:0;font-size:13px;line-height:1.6">{{ detailWhy }}</p>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <sc-for list="{{ detailNotes }}" as="d" hint-placeholder-count="4">
+              <div style="border:1px solid var(--line);border-radius:var(--r);background:var(--panel);padding:15px 16px;display:flex;flex-direction:column;gap:7px">
+                <span style="font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted)">{{ d.label }}</span>
+                <span style="font-size:12.5px;line-height:1.5">{{ d.text }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </section>
+    </sc-if>
+
+    <sc-if value="{{ showCorridors }}" hint-placeholder-val="{{ true }}">
+      <section style="display:flex;flex-direction:column;gap:12px">
+        <sc-for list="{{ corridors }}" as="c" hint-placeholder-count="3">
+          <article style="border:1px solid var(--line);border-radius:var(--r);background:var(--panel);padding:18px;display:grid;grid-template-columns:minmax(0,1.5fr) repeat(4,minmax(0,1fr));gap:20px;align-items:start">
+            <div style="display:flex;flex-direction:column;gap:9px">
+              <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:{{ c.levelColor }}">{{ c.level }} road pressure</span>
+              <span style="font-family:var(--fdisp);font-size:15px;font-weight:600;line-height:1.3">{{ c.name }}</span>
+              <span style="font-size:11.5px;color:var(--muted)">{{ c.mode }} · confidence {{ c.confidence }}</span>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:2px">
+                <sc-for list="{{ c.signals }}" as="s" hint-placeholder-count="2">
+                  <span style="border:1px solid var(--line);border-radius:999px;padding:4px 9px;font-size:10.5px;color:var(--muted)">{{ s }}</span>
+                </sc-for>
+              </div>
+            </div>
+            <sc-for list="{{ c.metrics }}" as="m" hint-placeholder-count="4">
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <span style="font-size:10px;letter-spacing:.11em;text-transform:uppercase;color:var(--muted)">{{ m.label }}</span>
+                <span style="font-family:var(--fnum);font-size:24px;letter-spacing:-0.03em;color:{{ m.tone }}">{{ m.value }}</span>
+                <span style="font-size:11px;color:var(--muted);line-height:1.4">{{ m.sub }}</span>
+              </div>
+            </sc-for>
+            <p style="grid-column:1 / -1;margin:0;padding-top:14px;border-top:1px solid var(--line);font-size:12.5px;line-height:1.6;color:var(--muted)">{{ c.recommendation }}</p>
+          </article>
+        </sc-for>
+      </section>
+    </sc-if>
+
+    <sc-if value="{{ showRisks }}" hint-placeholder-val="{{ true }}">
+      <section style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px">
+        <sc-for list="{{ risks }}" as="r" hint-placeholder-count="3">
+          <article style="border:1px solid {{ r.border }};border-radius:var(--r);background:var(--panel);padding:18px;display:flex;flex-direction:column;gap:12px">
+            <div style="display:flex;align-items:center;justify-content:space-between">
+              <span style="border-radius:999px;padding:4px 10px;font-size:10px;letter-spacing:.11em;text-transform:uppercase;background:{{ r.pillBg }};color:{{ r.pillFg }}">{{ r.level }}</span>
+              <span style="font-size:11px;color:var(--muted)">{{ r.window }}</span>
+            </div>
+            <span style="font-family:var(--fdisp);font-size:15px;font-weight:600;line-height:1.3">{{ r.place }}</span>
+            <p style="margin:0;font-size:12.5px;line-height:1.55;color:var(--muted)">{{ r.reason }}</p>
+            <div style="display:flex;flex-direction:column;gap:6px;padding-top:12px;border-top:1px solid var(--line)">
+              <span style="font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted)">Affected activity</span>
+              <span style="font-size:12.5px">{{ r.activity }}</span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px;padding-top:12px;border-top:1px solid var(--line)">
+              <span style="font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted)">Response</span>
+              <span style="font-size:12.5px;line-height:1.5">{{ r.response }}</span>
+            </div>
+          </article>
+        </sc-for>
+      </section>
+    </sc-if>
+
+    <sc-if value="{{ showRecs }}" hint-placeholder-val="{{ true }}">
+      <section style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px">
+        <sc-for list="{{ recs }}" as="r" hint-placeholder-count="4">
+          <article style="border:1px solid var(--line);border-radius:var(--r);background:{{ r.bg }};color:{{ r.fg }};padding:18px;display:flex;flex-direction:column;gap:13px">
+            <div style="display:flex;align-items:center;gap:10px">
+              <span style="border-radius:999px;padding:4px 10px;font-size:10px;letter-spacing:.11em;text-transform:uppercase;border:1px solid {{ r.pillBorder }};color:{{ r.pillFg }}">{{ r.priority }}</span>
+              <span style="font-size:11px;opacity:.6">{{ r.place }}</span>
+            </div>
+            <span style="font-family:var(--fdisp);font-size:15.5px;font-weight:600;line-height:1.35">{{ r.problem }}</span>
+            <div style="display:flex;flex-direction:column;gap:10px;padding-top:12px;border-top:1px solid {{ r.rule }}">
+              <div style="display:grid;grid-template-columns:88px minmax(0,1fr);gap:12px">
+                <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;opacity:.55">Evidence</span>
+                <span style="font-size:12.5px;line-height:1.5">{{ r.evidence }}</span>
+              </div>
+              <div style="display:grid;grid-template-columns:88px minmax(0,1fr);gap:12px">
+                <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;opacity:.55">Action</span>
+                <span style="font-size:12.5px;line-height:1.5">{{ r.action }}</span>
+              </div>
+              <div style="display:grid;grid-template-columns:88px minmax(0,1fr);gap:12px">
+                <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;opacity:.55">Objective</span>
+                <span style="font-size:12.5px;line-height:1.5">{{ r.objective }}</span>
+              </div>
+            </div>
+          </article>
+        </sc-for>
+      </section>
+    </sc-if>
+
+    <sc-if value="{{ showQueue }}" hint-placeholder-val="{{ true }}">
+      <section style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px">
+        <sc-for list="{{ priorityCounts }}" as="p" hint-placeholder-count="4">
+          <div style="border:1px solid var(--line);border-radius:var(--r);background:var(--panel);padding:16px;display:flex;align-items:flex-end;justify-content:space-between">
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <span style="width:7px;height:7px;border-radius:50%;background:{{ p.color }}"></span>
+              <span style="font-size:11.5px;color:var(--muted)">{{ p.label }}</span>
+            </div>
+            <span style="font-family:var(--fnum);font-size:34px;line-height:.9;letter-spacing:-0.04em;color:{{ p.color }}">{{ p.count }}</span>
+          </div>
+        </sc-for>
+      </section>
+    </sc-if>
+
+    <sc-if value="{{ showSimulator }}" hint-placeholder-val="{{ true }}">
+      <section style="border:1px solid var(--line);border-radius:var(--r);background:var(--panel);padding:18px;display:grid;grid-template-columns:270px minmax(0,1fr);gap:26px">
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <span style="font-family:var(--fdisp);font-size:14px;font-weight:600">Intervention simulator</span>
+          <p style="margin:0;font-size:12px;line-height:1.55;color:var(--muted)">Projected redistribution if the selected measure is deployed in the peak window.</p>
+          <select value="{{ scenario }}" onChange="{{ onScenario }}" style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:12.5px;cursor:pointer">
+            <sc-for list="{{ scenarioOptions }}" as="s" hint-placeholder-count="6"><option value="{{ s.value }}">{{ s.label }}</option></sc-for>
+          </select>
+          <div style="display:flex;flex-direction:column;gap:5px;padding-top:12px;border-top:1px solid var(--line)">
+            <span style="font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted)">Impact type</span>
+            <span style="font-size:12.5px">{{ sim.impactType }}</span>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:22px">
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <span style="font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted)">Relieved · {{ sim.primaryName }}</span>
+            <div style="display:flex;align-items:baseline;gap:12px">
+              <span style="font-family:var(--fnum);font-size:34px;letter-spacing:-0.03em;line-height:1">{{ sim.projectedPrimary }}</span>
+              <span style="font-size:12px;color:var(--muted);text-decoration:line-through">{{ sim.currentPrimary }}</span>
+              <span style="font-size:12px;color:var(--crit)">−{{ sim.primaryDrop }}%</span>
+            </div>
+            <div style="height:8px;background:var(--panel2);border-radius:999px;overflow:hidden">
+              <div style="width:{{ sim.primaryBar }}%;height:100%;background:var(--crit);border-radius:999px"></div>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <span style="font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted)">Absorbed · {{ sim.alternativeName }}</span>
+            <div style="display:flex;align-items:baseline;gap:12px">
+              <span style="font-family:var(--fnum);font-size:34px;letter-spacing:-0.03em;line-height:1">{{ sim.projectedAlternative }}</span>
+              <span style="font-size:12px;color:var(--muted);text-decoration:line-through">{{ sim.currentAlternative }}</span>
+              <span style="font-size:12px;color:var(--mod)">+{{ sim.altGain }}%</span>
+            </div>
+            <div style="height:8px;background:var(--panel2);border-radius:999px;overflow:hidden">
+              <div style="width:{{ sim.altBar }}%;height:100%;background:var(--mod);border-radius:999px"></div>
+            </div>
+          </div>
+          <div style="grid-column:1 / -1;padding-top:14px;border-top:1px solid var(--line);font-size:12.5px;color:var(--muted)">{{ sim.shifted }} visits shifted per week · {{ sim.scenarioLabel }} · requires field validation before deployment</div>
+        </div>
+      </section>
+    </sc-if>
+
+    <sc-if value="{{ showActions }}" hint-placeholder-val="{{ true }}">
+      <section style="display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;padding-top:6px">
+          <span style="font-family:var(--fdisp);font-size:15px;font-weight:600">{{ actionsTitle }}</span>
+          <span style="font-size:11px;color:var(--muted)">{{ actionsNote }}</span>
+        </div>
+        <sc-for list="{{ actionsList }}" as="a" hint-placeholder-count="4">
+          <article style="border:1px solid var(--line);border-left:3px solid {{ a.color }};border-radius:var(--r);background:var(--panel);padding:17px 18px;display:grid;grid-template-columns:118px minmax(0,1.5fr) minmax(0,1.1fr);gap:22px">
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:{{ a.color }}">{{ a.priority }}</span>
+              <span style="font-family:var(--fnum);font-size:30px;letter-spacing:-0.03em;line-height:1">{{ a.score }}</span>
+              <span style="font-size:10.5px;color:var(--muted)">priority score</span>
+              <span style="font-size:10.5px;color:var(--muted);padding-top:8px;border-top:1px solid var(--line)">Confidence {{ a.confidence }}</span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:10px;min-width:0">
+              <span style="font-family:var(--fdisp);font-size:15px;font-weight:600;line-height:1.35">{{ a.title }}</span>
+              <div style="display:flex;gap:7px;flex-wrap:wrap">
+                <span style="border:1px solid var(--line);border-radius:999px;padding:4px 10px;font-size:10.5px;color:var(--muted)">{{ a.category }}</span>
+                <span style="border:1px solid var(--line);border-radius:999px;padding:4px 10px;font-size:10.5px;color:var(--muted)">{{ a.location }}</span>
+                <span style="border:1px solid var(--line);border-radius:999px;padding:4px 10px;font-size:10.5px;color:var(--muted)">{{ a.status }}</span>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:5px;padding-top:10px;border-top:1px solid var(--line)">
+                <span style="font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted)">Evidence</span>
+                <sc-for list="{{ a.evidence }}" as="e" hint-placeholder-count="4">
+                  <span style="font-size:12px;line-height:1.5;color:var(--muted)">· {{ e }}</span>
+                </sc-for>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:12px">
+              <div style="display:flex;flex-direction:column;gap:5px">
+                <span style="font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted)">Recommended action</span>
+                <span style="font-size:12.5px;line-height:1.55">{{ a.recommendedAction }}</span>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:5px;padding-top:12px;border-top:1px solid var(--line)">
+                <span style="font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted)">Expected impact</span>
+                <span style="font-size:12.5px;line-height:1.55;color:var(--muted)">{{ a.expectedImpact }}</span>
+              </div>
+              <div style="display:flex;gap:9px;margin-top:auto;padding-top:12px">
+                <button style="flex:1;border:0;border-radius:999px;padding:9px 14px;font-size:12px;background:var(--hi);color:var(--onhi);cursor:pointer" style-hover="opacity:.85">Assign owner</button>
+                <button style="flex:1;border:1px solid var(--line);border-radius:999px;padding:9px 14px;font-size:12px;background:transparent;cursor:pointer" style-hover="background:var(--panel2)">Score detail</button>
+              </div>
+            </div>
+          </article>
+        </sc-for>
+      </section>
+    </sc-if>
+
+    <sc-if value="{{ showPrivacy }}" hint-placeholder-val="{{ true }}">
+      <section style="display:flex;flex-direction:column;gap:12px">
+        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px">
+          <sc-for list="{{ privacyRules }}" as="p" hint-placeholder-count="4">
+            <article style="border:1px solid var(--line);border-radius:var(--r);background:var(--panel);padding:18px;display:flex;flex-direction:column;gap:9px">
+              <span style="font-family:var(--fdisp);font-size:14.5px;font-weight:600">{{ p.title }}</span>
+              <p style="margin:0;font-size:12.5px;line-height:1.6;color:var(--muted)">{{ p.body }}</p>
+            </article>
+          </sc-for>
+        </div>
+        <div style="border:1px solid var(--line);border-radius:var(--r);background:var(--hi);color:var(--onhi);padding:20px;display:grid;grid-template-columns:200px minmax(0,1fr);gap:26px;align-items:center">
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <span style="font-family:var(--fnum);font-size:56px;line-height:.85;letter-spacing:-0.04em">{{ minAgg }}</span>
+            <span style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;opacity:.6">Minimum contributors</span>
+          </div>
+          <p style="margin:0;font-size:13px;line-height:1.6">Any location-level statistic below the threshold is withheld and the console shows an insufficient-aggregation state instead of a number. Thresholds, retention windows and feed sources are configured per data-sharing agreement and audited monthly.</p>
+        </div>
+        <div style="border:1px solid var(--line);border-radius:var(--r);background:var(--panel);overflow:hidden">
+          <div style="display:grid;grid-template-columns:minmax(0,1.6fr) 130px 130px 150px;gap:14px;padding:11px 18px;border-bottom:1px solid var(--line);font-size:10px;letter-spacing:.11em;text-transform:uppercase;color:var(--muted)">
+            <span>Feed</span><span>Records</span><span>Freshness</span><span>Aggregation</span>
+          </div>
+          <sc-for list="{{ feeds }}" as="f" hint-placeholder-count="4">
+            <div style="display:grid;grid-template-columns:minmax(0,1.6fr) 130px 130px 150px;gap:14px;padding:13px 18px;border-bottom:1px solid var(--line);align-items:center">
+              <span style="font-size:12.5px">{{ f.name }}</span>
+              <span style="font-family:var(--fnum);font-size:12.5px;color:var(--muted)">{{ f.records }}</span>
+              <span style="font-size:12px;color:var(--muted)">{{ f.freshness }}</span>
+              <span style="font-size:11px;color:{{ f.tone }}">{{ f.state }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </section>
+    </sc-if>
+
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;console&quot;,&quot;field&quot;],&quot;default&quot;:&quot;console&quot;,&quot;tsType&quot;:&quot;'console' | 'field'&quot;,&quot;section&quot;:&quot;Direction&quot;},&quot;presentation&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Direction&quot;}}">
+class Component extends DCLogic {
+  state = {
+    m: null, route: "dashboard", region: "All regions", category: "All categories",
+    dateRange: "Last 7 days", scenario: "promote", selectedId: "panambur-beach",
+    theme: null, presentation: null, clock: ""
+  };
+
+  componentDidMount() {
+    import("./tripsafe-model.js").then((m) => this.setState({ m }));
+    this.tick();
+    this.timer = setInterval(() => this.tick(), 20000);
+  }
+  componentWillUnmount() { clearInterval(this.timer); }
+  componentDidUpdate() { this.mountMap(); }
+
+  tick() {
+    const d = new Date();
+    this.setState({ clock: d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) });
+    this.mountMap();
+  }
+
+  get theme() { return this.state.theme || this.props.theme || "console"; }
+  get presentation() { return this.state.presentation === null ? !!this.props.presentation : this.state.presentation; }
+
+  themeVars() {
+    const p = this.presentation;
+    const common = `--r:14px;--maph:${p ? "420px" : "356px"};--h1:${p ? "40px" : "27px"};--kpi:${p ? "clamp(26px,2.9vw,42px)" : "clamp(20px,2.1vw,31px)"}`;
+    if (this.theme === "field") {
+      return "--bg:#101214;--panel:#1B1E21;--panel2:#252a2e;--line:rgba(242,240,234,.09);--text:#F2F0EA;--muted:#8B9390;" +
+        "--hi:#F2F0EA;--onhi:#101214;--accent:#E4572E;--brand:#E4572E;--crit:#E4572E;--high:#F2C230;--mod:#3FBF74;--low:#8B9390;" +
+        "--fdisp:'Space Grotesk',system-ui;--fbody:'Space Grotesk',system-ui;--fnum:'Space Grotesk',system-ui;" + common.replace("--r:14px", "--r:18px");
+    }
+    return "--bg:#0c0e0d;--panel:#141816;--panel2:#1b201d;--line:rgba(232,236,233,.10);--text:#e8ece9;--muted:#8d9691;" +
+      "--hi:#dde5da;--onhi:#12150f;--accent:#b9cfae;--brand:#E4572E;--crit:#E4572E;--high:#F2C230;--mod:#3FBF74;--low:#7f8d85;" +
+      "--fdisp:'Space Grotesk',system-ui;--fbody:'Archivo',system-ui;--fnum:'Space Mono',ui-monospace;" + common;
+  }
+
+  crowdColor(level) { return `var(--${level === "critical" ? "crit" : level === "high" ? "high" : level === "moderate" ? "mod" : "low"})`; }
+  priorityColor(p) { return p === "urgent" ? "var(--crit)" : p === "high" ? "var(--high)" : p === "opportunity" ? "var(--mod)" : "var(--low)"; }
+
+  ctx() {
+    const m = this.state.m;
+    if (!m) return null;
+    const all = m.joinPlaces();
+    const pws = all
+      .filter((p) => this.state.region === "All regions" || p.region === this.state.region)
+      .filter((p) => this.state.category === "All categories" || p.category === this.state.category);
+    const places = pws.length ? pws : all;
+    const mob = m.deriveMobility().filter((x) => x.connectedPlaceIds.some((id) => places.some((p) => p.id === id)));
+    const mobAll = mob.length ? mob : m.deriveMobility();
+    const risks = m.riskSignals.filter((r) => places.some((p) => p.id === r.placeId));
+    const actions = m.buildActions(places, risks, mobAll);
+    const selected = places.find((p) => p.id === this.state.selectedId) || places[0];
+    return { m, places, mob: mobAll, risks, actions, selected };
+  }
+
+  mountMap() {
+    const root = this.rootEl || document.querySelector("[data-map]")?.closest("div");
+    const el = document.querySelector("[data-map]");
+    const c = this.ctx();
+    if (!el || !c || typeof L === "undefined") return;
+    if (el._ts && el._tsTheme === this.theme) { this.paintMarkers(el._ts, c, el); return; }
+    if (el._ts) { el._ts.remove(); el._ts = null; }
+    const map = L.map(el, { zoomControl: true, attributionControl: false, scrollWheelZoom: false });
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", { subdomains: "abcd", maxZoom: 19 }).addTo(map);
+    el._ts = map; el._tsTheme = this.theme; el._layers = [];
+    this.paintMarkers(map, c, el);
+  }
+
+  paintMarkers(map, c, el) {
+    (el._layers || []).forEach((l) => map.removeLayer(l));
+    el._layers = [];
+    const max = Math.max(...c.places.map((p) => p.stat.visitCount));
+    const colors = this.theme === "field"
+      ? { critical: "#E4572E", high: "#F2C230", moderate: "#3FBF74", low: "#8B9390" }
+      : { critical: "#E4572E", high: "#F2C230", moderate: "#3FBF74", low: "#7f8d85" };
+    c.places.forEach((p) => {
+      const col = colors[p.stat.crowdLevel];
+      const marker = L.circleMarker([p.lat, p.lng], {
+        radius: 8 + Math.sqrt(p.stat.visitCount / max) * 18,
+        color: col, weight: 1.2, fillColor: col, fillOpacity: p.id === c.selected.id ? 0.42 : 0.2
+      }).addTo(map);
+      marker.bindTooltip(
+        `<span style="font-family:system-ui;font-size:11px">${p.name}<br>${p.stat.visitCount.toLocaleString("en-IN")} visits · ${p.stat.crowdLevel} · peak ${p.stat.peakHour}</span>`,
+        { direction: "top", opacity: 0.95 }
+      );
+      marker.on("click", () => this.setState({ selectedId: p.id }));
+      el._layers.push(marker);
+    });
+    c.mob.forEach((corridor) => {
+      const pts = corridor.connectedPlaceIds.map((id) => c.places.find((p) => p.id === id)).filter(Boolean).map((p) => [p.lat, p.lng]);
+      if (pts.length < 2) return;
+      const line = L.polyline(pts, { color: colors[corridor.roadPressureLevel] || "#888", weight: 1.6, opacity: 0.6, dashArray: "5 6" }).addTo(map);
+      el._layers.push(line);
+    });
+    const bounds = L.latLngBounds(c.places.map((p) => [p.lat, p.lng]));
+    map.fitBounds(bounds, { padding: [42, 42] });
+    setTimeout(() => map.invalidateSize(), 60);
+  }
+
+  routeMeta() {
+    return {
+      dashboard: ["Operations overview", "Aggregated visitation, crowd pressure, mobility and advisory signals for the selected region and window."],
+      actions: ["Action centre", "Ranked interventions with the evidence, score composition and expected impact behind each one."],
+      tourism: ["Tourism intelligence", "Demand patterns across time, activity category and destination ranking."],
+      crowd: ["Crowd management", "Where visitors are concentrating now and which measures relieve the peak window."],
+      opportunities: ["Tourism opportunities", "High-rated, under-visited destinations ranked by promotion potential."],
+      mobility: ["Mobility & roads", "Corridor pressure between origin zones and destinations, separated into observed, calculated and inferred signals."],
+      safety: ["Safety & risk", "Advisory conditions intersecting tourism activity, with the coordinated response for each."],
+      recommendations: ["Recommendations", "Rule-based recommendations with a transparent evidence trail."],
+      destinations: ["Destinations", "Destination health, pressure and the reasoning behind each recommendation."],
+      privacy: ["Data & privacy", "Aggregation thresholds, feed provenance and what the authority console never receives."]
+    }[this.state.route];
+  }
+
+  renderVals() {
+    const c = this.ctx();
+    const m = this.state.m;
+    const route = this.state.route;
+    const [routeTitle, routeBlurb] = this.routeMeta();
+    const set = (k, v) => () => this.setState({ [k]: v });
+
+    const tabs = [
+      ["dashboard", "Overview"], ["actions", "Action centre"], ["tourism", "Tourism"], ["crowd", "Crowd"],
+      ["opportunities", "Opportunities"], ["mobility", "Mobility"], ["safety", "Safety"],
+      ["recommendations", "Recommendations"], ["destinations", "Destinations"], ["privacy", "Data & privacy"]
+    ].map(([id, label]) => ({
+      label, go: set("route", id),
+      color: route === id ? "var(--text)" : "var(--muted)",
+      bar: route === id ? "var(--brand)" : "transparent",
+      weight: route === id ? 600 : 400
+    }));
+
+    const base = {
+      themeVars: this.themeVars(), clock: this.state.clock || "—", feedAge: "12 min ago",
+      routeTitle, routeBlurb, tabs,
+      region: this.state.region, category: this.state.category, dateRange: this.state.dateRange, scenario: this.state.scenario,
+      regionOptions: ["All regions", "Bengaluru", "Coastal Karnataka", "Hill Corridor"],
+      categoryOptions: ["All categories", "Heritage", "Entertainment", "Park", "Market", "Restaurant", "Beach", "Viewpoint", "Nature"],
+      dateOptions: ["Today", "Last 7 days", "Festival week"],
+      onRegion: (e) => this.setState({ region: e.target.value }),
+      onCategory: (e) => this.setState({ category: e.target.value }),
+      onDateRange: (e) => this.setState({ dateRange: e.target.value }),
+      onScenario: (e) => this.setState({ scenario: e.target.value }),
+      setConsole: () => this.setState({ theme: "console" }),
+      setField: () => this.setState({ theme: "field" }),
+      togglePresentation: () => this.setState({ presentation: !this.presentation }),
+      presentationLabel: this.presentation ? "Exit presentation" : "Presentation",
+      themeAbg: this.theme === "console" ? "var(--hi)" : "transparent",
+      themeAfg: this.theme === "console" ? "var(--onhi)" : "var(--muted)",
+      themeBbg: this.theme === "field" ? "var(--hi)" : "transparent",
+      themeBfg: this.theme === "field" ? "var(--onhi)" : "var(--muted)",
+      crowdLegend: ["critical", "high", "moderate", "low"].map((l) => ({ label: l, color: this.crowdColor(l) })),
+      showKpis: false, showMap: false, showMapSide: true, showMobilityStrip: false, showCharts: false,
+      showCategories: false, showTable: false, showDetail: false, showCorridors: false, showRisks: false,
+      showRecs: false, showQueue: false, showSimulator: false, showActions: false, showPrivacy: false,
+      mapGrid: "1.55fr 1fr"
+    };
+    if (!c) return base;
+
+    const nf = (v) => Number(v).toLocaleString("en-IN");
+    const summary = m.mobilitySummary(c.mob);
+    const grouped = m.groupedActions(c.actions);
+    const sim = m.simulateImpact(this.state.scenario, c.places);
+    const kpiRaw = m.kpis(c.places, c.risks);
+
+    const kpiList = kpiRaw.map((k, i) => ({
+      label: k.label, value: k.value, delta: k.delta,
+      bg: i === 0 ? "var(--hi)" : "var(--panel)",
+      fg: i === 0 ? "var(--onhi)" : "var(--text)",
+      border: i === 0 ? "var(--hi)" : "var(--line)",
+      tone: k.tone ? this.crowdColor(k.tone) : "inherit",
+      size: k.small ? "17px" : (/^[\d,+.%\s-]+$|min$/.test(k.value) ? "var(--kpi)" : "20px")
+    }));
+
+    const maxVisit = Math.max(...m.visitsOverTime.map(([, v]) => v));
+    const peakDay = m.visitsOverTime.reduce((a, b) => (b[1] > a[1] ? b : a));
+    const visitBars = m.visitsOverTime.map(([label, v]) => ({
+      label, value: nf(v), h: Math.round((v / maxVisit) * 100),
+      fill: v === maxVisit ? "var(--hi)" : "var(--panel2)",
+      tone: v === maxVisit ? "var(--text)" : "var(--muted)"
+    }));
+    const maxHour = Math.max(...m.hourlyCurve);
+    const hourBars = m.hourlyCurve.map((v, i) => ({
+      h: Math.max(3, Math.round((v / maxHour) * 100)),
+      fill: v >= maxHour * 0.85 ? "var(--accent)" : "var(--panel2)"
+    }));
+    const cats = m.categoryDistribution(c.places);
+    const maxCat = Math.max(...cats.map((x) => x.value));
+    const categoryBars = cats.map((x) => ({ label: x.label, value: nf(x.value), w: Math.round((x.value / maxCat) * 100), fill: "var(--accent)" }));
+
+    const row = (p, extra, extraColor) => ({
+      name: p.name, sub: `${p.category} · ${p.stat.dominantActivity}`, visits: nf(p.stat.visitCount),
+      dwell: `${p.stat.averageDwellMinutes}m`, peak: p.stat.peakHour, crowd: p.stat.crowdLevel.toUpperCase(),
+      crowdColor: this.crowdColor(p.stat.crowdLevel), extra, extraColor: extraColor || "var(--text)",
+      bg: p.id === c.selected.id ? "var(--panel2)" : "transparent",
+      select: () => this.setState({ selectedId: p.id })
+    });
+
+    const actionCard = (a) => ({
+      title: a.title, priority: a.priority, score: a.priorityScore, color: this.priorityColor(a.priority),
+      category: a.category, location: a.location, status: a.status, confidence: a.dataConfidence,
+      evidence: a.evidence.slice(0, 4), recommendedAction: a.recommendedAction, expectedImpact: a.expectedImpact
+    });
+
+    const health = m.destinationHealth(c.selected, c.risks, c.mob);
+    const alt = c.selected.alternatives.map((id) => c.places.find((p) => p.id === id)).filter(Boolean).map((p) => p.name).join(", ");
+    const selRisk = c.risks.find((r) => r.placeId === c.selected.id);
+    const selMob = c.mob.filter((x) => x.connectedPlaceIds.includes(c.selected.id))[0];
+
+    const v = {
+      ...base,
+      contextChips: [
+        `${c.places.length} destinations in view`,
+        `${this.state.region} · ${this.state.dateRange}`,
+        `${c.actions.length} open interventions`
+      ],
+      kpiList,
+      visitBars, hourBars, categoryBars,
+      visitsTotal: nf(m.visitsOverTime.reduce((s, [, x]) => s + x, 0)),
+      visitsPeakDay: peakDay[0],
+      hourlyPeak: `${m.hourlyCurve.indexOf(maxHour)}:00`,
+      mobilityStats: [
+        { label: "Road pressure", value: summary.roadPressure.toUpperCase(), tone: this.crowdColor(summary.roadPressure), size: "22px" },
+        { label: "Transit pressure", value: String(summary.transitPressure).toUpperCase(), tone: this.crowdColor(summary.transitPressure), size: "22px" },
+        { label: "Visitor concentration", value: summary.visitorConcentration, tone: "var(--text)", size: "22px" },
+        { label: "Peak window", value: summary.peakWindow, tone: "var(--text)", size: "22px" },
+        { label: "Average delay", value: `+${summary.averageDelay}%`, tone: "var(--crit)", size: "22px" },
+        { label: "Top corridor", value: summary.topCorridor, tone: "var(--text)", size: "13px" }
+      ],
+      corridors: c.mob.map((x) => ({
+        name: x.corridorName, level: x.roadPressureLevel, levelColor: this.crowdColor(x.roadPressureLevel),
+        mode: x.transportMode, confidence: x.confidence, signals: x.inferredSignals, recommendation: x.recommendation,
+        metrics: [
+          { label: "Aggregated trips", value: nf(x.tripCount), sub: `peak ${x.peakWindow}`, tone: "var(--text)" },
+          { label: "Average travel", value: `${x.averageTravelMinutes}m`, sub: `baseline ${x.baselineTravelMinutes}m`, tone: "var(--text)" },
+          { label: "Travel delay", value: `+${x.delayPercent}%`, sub: "against baseline", tone: "var(--crit)" },
+          { label: "Road pressure", value: `${x.roadPressurePercent}%`, sub: `${x.corridorConcentrationPercent}% concentration`, tone: this.crowdColor(x.roadPressureLevel) }
+        ]
+      })),
+      risks: c.risks.map((r) => ({
+        level: r.level, place: (c.places.find((p) => p.id === r.placeId) || {}).name || r.placeId,
+        reason: r.reason, activity: r.affectedActivity, response: r.suggestedResponse,
+        window: (c.places.find((p) => p.id === r.placeId) || { stat: {} }).stat.peakHour || "",
+        border: r.level === "high" ? "var(--crit)" : "var(--line)",
+        pillBg: r.level === "high" ? "var(--crit)" : "var(--panel2)",
+        pillFg: r.level === "high" ? "#12150f" : "var(--muted)"
+      })),
+      recs: m.recommendations.map((r, i) => ({
+        priority: r.priority, place: (m.places.find((p) => p.id === r.placeId) || {}).name || "",
+        problem: r.problem, evidence: r.evidence, action: r.action, objective: r.objective,
+        bg: i === 0 ? "var(--hi)" : "var(--panel)", fg: i === 0 ? "var(--onhi)" : "var(--text)",
+        rule: i === 0 ? "rgba(0,0,0,.12)" : "var(--line)",
+        pillBorder: i === 0 ? "rgba(0,0,0,.25)" : "var(--line)",
+        pillFg: i === 0 ? "var(--onhi)" : (r.priority === "high" ? "var(--high)" : "var(--muted)")
+      })),
+      priorityCounts: grouped.map((g) => ({ label: g.label, count: g.count, color: this.priorityColor(g.priority) })),
+      scenarioOptions: [
+        { value: "promote", label: "Promote alternative destination" }, { value: "redirect", label: "Redirect visitors" },
+        { value: "shuttle", label: "Add shuttle service" }, { value: "parking", label: "Increase parking" },
+        { value: "signage", label: "Improve signage" }, { value: "pedestrian", label: "Pedestrian infrastructure" }
+      ],
+      sim: { ...sim, primaryBar: 100 - sim.primaryDrop, altBar: Math.min(100, 60 + sim.altGain / 3) },
+      detailName: c.selected.name, detailScore: health.score,
+      detailScoreFill: health.score >= 60 ? "var(--onhi)" : "var(--crit)",
+      detailFactors: [
+        { label: "Working", text: health.good.join(" · ") || "—" },
+        { label: "Warning", text: health.warning.join(" · ") || "None in the current window" },
+        { label: "Opportunity", text: health.opportunity.join(" · ") }
+      ],
+      detailWhy: m.whyThisMatters(c.selected, c.mob),
+      detailNotes: [
+        { label: "Crowd management", text: m.destinationRecommendation(c.selected) },
+        { label: "Mobility", text: selMob ? selMob.recommendation : "No elevated corridor pressure connected to this destination." },
+        { label: "Safety", text: selRisk ? selRisk.suggestedResponse : "No advisory risk active for this destination." },
+        { label: "Nearby alternatives", text: alt || "No alternatives configured." }
+      ],
+      privacyRules: m.privacyRules, minAgg: m.MIN_AGGREGATION_THRESHOLD,
+      feeds: [
+        { name: "Consented mobility observations", records: nf(84210), freshness: "12 min ago", state: "Aggregated", tone: "var(--mod)" },
+        { name: "Destination visit aggregates", records: nf(12480), freshness: "12 min ago", state: "Aggregated", tone: "var(--mod)" },
+        { name: "Weather & advisory service", records: nf(96), freshness: "4 min ago", state: "Public source", tone: "var(--muted)" },
+        { name: "Road & transit corridor telemetry", records: nf(22760), freshness: "31 min ago", state: "Threshold-limited", tone: "var(--high)" }
+      ]
+    };
+
+    if (route === "dashboard") Object.assign(v, {
+      showKpis: true, showMap: true, showMobilityStrip: true, showCharts: true, showQueue: true, showSimulator: true,
+      showActions: true, actionsTitle: "Top interventions", actionsNote: "Ranked by priority score",
+      actionsList: c.actions.slice(0, 3).map(actionCard),
+      sideTitle: "Signals worth acting on",
+      sideList: m.keyInsights(c.places, c.risks, c.mob).map((i) => ({
+        tag: i.tag, text: i.text, sub: "", tagColor: i.tag === "CROWD" || i.tag === "ADVISORY" ? "var(--crit)" : i.tag === "OPPORTUNITY" ? "var(--mod)" : "var(--muted)"
+      }))
+    });
+
+    if (route === "actions") Object.assign(v, {
+      showQueue: true, showSimulator: true, showActions: true,
+      actionsTitle: "Intervention queue", actionsNote: `${c.actions.length} items · evidence and score shown for each`,
+      actionsList: c.actions.map(actionCard)
+    });
+
+    if (route === "tourism") Object.assign(v, {
+      showCharts: true, showCategories: true, showTable: true,
+      tableTitle: "Destination demand", tableNote: "Sorted by aggregated visits", tableExtraLabel: "Trend",
+      tableRows: [...c.places].sort((a, b) => b.stat.visitCount - a.stat.visitCount).map((p) =>
+        row(p, `${p.stat.trendPercent > 0 ? "+" : ""}${p.stat.trendPercent}%`, p.stat.trendPercent < 0 ? "var(--crit)" : "var(--mod)"))
+    });
+
+    if (route === "crowd") Object.assign(v, {
+      showMap: true, showActions: true,
+      actionsTitle: "Crowd measures", actionsNote: "Peak-window interventions and redistribution",
+      actionsList: c.actions.filter((a) => a.category === "Crowd management" || a.category === "Visitor redistribution").map(actionCard),
+      sideTitle: "Concentration right now",
+      sideList: [...c.places].sort((a, b) => b.stat.visitCount / b.capacity - a.stat.visitCount / a.capacity).slice(0, 5).map((p) => ({
+        tag: `${Math.round((p.stat.visitCount / p.capacity) * 100)}% of capacity · ${p.stat.crowdLevel}`,
+        text: p.name, sub: `Peak ${p.stat.peakHour} · ${m.destinationRecommendation(p)}`,
+        tagColor: this.crowdColor(p.stat.crowdLevel)
+      }))
+    });
+
+    if (route === "opportunities") Object.assign(v, {
+      showTable: true, showActions: true,
+      tableTitle: "Promotion potential", tableNote: "Rating, under-visitation, dwell and headroom", tableExtraLabel: "Score",
+      tableRows: m.opportunities(c.places).map((p) => row(p, String(p.opportunityScore), "var(--mod)")),
+      actionsTitle: "Promotion actions", actionsNote: "Hidden-gem and redistribution measures",
+      actionsList: c.actions.filter((a) => a.category === "Tourism promotion" || a.category === "Visitor redistribution").map(actionCard)
+    });
+
+    if (route === "mobility") Object.assign(v, {
+      showMobilityStrip: true, showCorridors: true, showActions: true,
+      actionsTitle: "Road, transit, parking and facility actions", actionsNote: "Field validation required before capacity decisions",
+      actionsList: c.actions.filter((a) => ["Road & traffic pressure", "Public transit pressure", "Parking & access", "Facility improvement"].includes(a.category)).map(actionCard)
+    });
+
+    if (route === "safety") Object.assign(v, {
+      showRisks: true, showActions: true,
+      actionsTitle: "Safety coordination", actionsNote: "Advisory response actions",
+      actionsList: c.actions.filter((a) => a.category === "Safety & risk").map(actionCard)
+    });
+
+    if (route === "recommendations") Object.assign(v, {
+      showRecs: true, showActions: true,
+      actionsTitle: "Explainable ranking", actionsNote: "Every score decomposed into its inputs",
+      actionsList: c.actions.slice(0, 6).map(actionCard)
+    });
+
+    if (route === "destinations") Object.assign(v, {
+      showMap: true, showMapSide: false, mapGrid: "1fr", showTable: true, showDetail: true,
+      tableTitle: "All destinations", tableNote: "Select a row to inspect", tableExtraLabel: "Rating",
+      tableRows: c.places.map((p) => row(p, p.rating.toFixed(1), "var(--muted)"))
+    });
+
+    if (route === "privacy") Object.assign(v, { showPrivacy: true });
+
+    return v;
+  }
+}
+</script>
+</body>
+</html>

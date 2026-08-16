@@ -1,5 +1,5 @@
 import { activeRepository } from "./data/repository.js";
-import { renderShell, destroyLeafletMaps, initializeLeafletMaps } from "./ui.js";
+import { renderShell, destroyLeafletMaps, initializeLeafletMaps, formatClock } from "./ui.js";
 import { joinPlacesWithStats } from "./services/intelligenceService.js";
 import { deriveMobilityMetrics } from "./services/mobilityService.js";
 import { buildActionCenter } from "./services/actionEngine.js";
@@ -12,7 +12,8 @@ const state = {
   crowd: "All Crowd Levels",
   selectedDestination: "central-heritage",
   scenario: "promote",
-  presentation: false
+  presentation: false,
+  clock: formatClock()
 };
 
 const data = {
@@ -54,15 +55,16 @@ function render() {
   const context = filteredContext();
   if (context.placesWithStats.length) {
     initializeLeafletMaps(state, { ...data, ...context }, selectDestination);
-    focusSelectedDestination();
   }
 }
 
-function focusSelectedDestination() {
-  const selectedRow = document.querySelector(`.destination-row[data-destination="${state.selectedDestination}"]`);
-  selectedRow?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-  document.getElementById("destination-detail")?.focus({ preventScroll: true });
+function tickClock() {
+  state.clock = formatClock();
+  const clockElement = document.querySelector("[data-clock]");
+  if (clockElement) clockElement.textContent = state.clock;
 }
+
+setInterval(tickClock, 20000);
 
 function bindEvents() {
   document.querySelectorAll("[data-route]").forEach((button) => {
@@ -75,7 +77,7 @@ function bindEvents() {
   document.querySelectorAll("[data-destination]").forEach((item) => {
     item.addEventListener("click", () => {
       state.selectedDestination = item.dataset.destination;
-      if (item.classList.contains("destination-row")) {
+      if (item.classList.contains("dest-row")) {
         state.route = "destinations";
       }
       render();

@@ -18,7 +18,7 @@ export function kpis(placesWithStats, riskSignals) {
       { label: "Most visited destination", value: "None", delta: "No matching aggregates" },
       { label: "Average dwell time", value: "0 min", delta: "No matching aggregates" },
       { label: "Crowd pressure", value: "N/A", delta: "No matching aggregates" },
-      { label: "Safety/risk alerts", value: riskSignals.length, delta: "Advisory demo insights", tone: "high" }
+      { label: "Safety/risk alerts", value: riskSignals.length, delta: "Advisory insights", tone: "high" }
     ];
   }
   const totalVisits = visible.reduce((sum, place) => sum + place.stat.visitCount, 0);
@@ -27,18 +27,18 @@ export function kpis(placesWithStats, riskSignals) {
   const dwell = Math.round(visible.reduce((sum, place) => sum + place.stat.averageDwellMinutes, 0) / visible.length);
   const pressure = [...visible].sort((a, b) => crowdRank[b.stat.crowdLevel] - crowdRank[a.stat.crowdLevel])[0];
   return [
-    { label: "Active consenting travellers", value: travellers.toLocaleString("en-IN"), delta: "Aggregated sample, demo" },
+    { label: "Active consenting travellers", value: travellers.toLocaleString("en-IN"), delta: "Aggregated sample" },
     { label: "Total visits", value: totalVisits.toLocaleString("en-IN"), delta: "+14% week over week" },
     { label: "Most visited destination", value: top.name, delta: `${top.stat.visitCount.toLocaleString("en-IN")} visits` },
     { label: "Average dwell time", value: `${dwell} min`, delta: "Across displayed aggregates" },
     { label: "Crowd pressure", value: pressure.stat.crowdLevel.toUpperCase(), delta: pressure.name, tone: pressure.stat.crowdLevel },
-    { label: "Safety/risk alerts", value: riskSignals.length, delta: "Advisory demo insights", tone: "high" }
+    { label: "Safety/risk alerts", value: riskSignals.length, delta: "Advisory insights", tone: "high" }
   ];
 }
 
 export function keyInsights(placesWithStats, risks, mobility) {
   if (!placesWithStats.length) {
-    return ["No matching aggregated demo data for the current filters."];
+    return ["No matching aggregated data for the current filters."];
   }
   const fastGrowing = [...placesWithStats].sort((a, b) => b.stat.trendPercent - a.stat.trendPercent)[0];
   const hiddenGem = tourismOpportunities(placesWithStats)[0];

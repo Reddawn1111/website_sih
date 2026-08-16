@@ -1,4 +1,4 @@
-# TripSafe Tourism Intelligence Dashboard
+# MyPravasa Tourism Intelligence Dashboard
 
 Static prototype for a government/tourism authority presentation.
 

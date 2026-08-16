@@ -1,6 +1,4 @@
 export const MIN_AGGREGATION_THRESHOLD = 5;
-export const DATA_SOURCE = "DEMO DATA";
-export const DATA_SOURCE_DETAIL = "simulated consenting travel observations";
 
 export const places = [
   { id: "central-heritage", name: "Central Heritage District", region: "Bengaluru", category: "Heritage", lat: 12.9716, lng: 77.5946, rating: 4.6, capacity: 14000, alternatives: ["cubbon-park", "kr-market"] },
@@ -44,7 +42,7 @@ export const hourlyCurve = [
 
 export const riskSignals = [
   { id: "risk-1", placeId: "panambur-beach", level: "high", reason: "Heavy rainfall forecast plus high visitor concentration", affectedActivity: "Evening beach visits", suggestedResponse: "Redirect visitors toward inland attractions and show advisory notices." },
-  { id: "risk-2", placeId: "western-ghat-view", level: "moderate", reason: "Demo landslide-prone corridor near viewpoint access road", affectedActivity: "Hill viewpoint travel", suggestedResponse: "Promote earlier return windows and publish route caution." },
+  { id: "risk-2", placeId: "western-ghat-view", level: "moderate", reason: "Landslide-prone corridor near viewpoint access road", affectedActivity: "Hill viewpoint travel", suggestedResponse: "Promote earlier return windows and publish route caution." },
   { id: "risk-3", placeId: "church-street", level: "high", reason: "Critical late-evening crowd pressure in entertainment cluster", affectedActivity: "Dining and nightlife", suggestedResponse: "Increase crowd marshals and promote nearby distributed food streets." }
 ];
 
@@ -67,7 +65,7 @@ export const mobilityInsights = [
 ];
 
 export const recommendations = [
-  { id: "rec-1", priority: "high", placeId: "panambur-beach", problem: "Beach Zone has evening crowd concentration.", evidence: "68% of demo daily visits occur between 5-8 PM and crowd pressure is critical.", action: "Promote Tannirbhavi Beach and Lake Viewpoint during the peak window.", objective: "Distribute tourism demand." },
+  { id: "rec-1", priority: "high", placeId: "panambur-beach", problem: "Beach Zone has evening crowd concentration.", evidence: "68% of daily visits occur between 5-8 PM and crowd pressure is critical.", action: "Promote Tannirbhavi Beach and Lake Viewpoint during the peak window.", objective: "Distribute tourism demand." },
   { id: "rec-2", priority: "high", placeId: "church-street", problem: "Entertainment cluster reaches critical late-evening pressure.", evidence: "Peak period is 7-10 PM with rising visits and high repeat visitation.", action: "Coordinate pedestrian management and promote Indiranagar overflow options.", objective: "Reduce crowding while preserving visitor experience." },
   { id: "rec-3", priority: "medium", placeId: "lake-viewpoint", problem: "High-rated viewpoint is under-visited.", evidence: "Rating 4.7, low crowd pressure, and +17% trend from a small base.", action: "Promote as a hidden gem alternative to the overcrowded beach viewpoint circuit.", objective: "Grow sustainable tourism in high-potential areas." },
   { id: "rec-4", priority: "medium", placeId: "western-ghat-view", problem: "Hill viewpoint corridor shows recurring mobility pressure.", evidence: "Movement corridor pressure is 73% during 3-6 PM.", action: "Publish return-window nudges and improve parking management.", objective: "Lower corridor stress and improve safety." }
